@@ -24,13 +24,13 @@ if ($releaseVersion -notmatch '^\d+\.\d+\.\d+$') {
 }
 
 $configSource = Read-Utf8File "HInspectConfig.lua"
-$keySystemSource = Read-Utf8File "KeySystem.lua"
+$loaderSource = Read-Utf8File "Loader.lua"
 $readmeSource = Read-Utf8File "README.md"
-if ([regex]::Matches($readmeSource, 'KeySystem\.lua').Count -lt 2) {
-    throw "O bootstrap do README deve conter as duas fontes."
+if ([regex]::Matches($readmeSource, 'Loader\.lua').Count -lt 2) {
+    throw "O README deve documentar o Loader.lua e seu bootstrap."
 }
 $configSource = Read-Utf8File "HInspectConfig.lua"
-$keySystemSource = Read-Utf8File "KeySystem.lua"
+$loaderSource = Read-Utf8File "Loader.lua"
 
 $modulePaths = New-Object Collections.Generic.List[string]
 $modulePaths.Add("HInspectConfig.lua")

@@ -11,7 +11,7 @@ $failures = New-Object Collections.Generic.List[string]
 & (Join-Path $PSScriptRoot "Build-Bundle.ps1") -Check
 
 $legacyModules = @(
-    "HMenu.lua", "HMenuConfig.lua", "HMenuSchema.lua", "dist\HMenu.bundle.lua",
+    "HMenu.lua", "HMenuConfig.lua", "HMenuSchema.lua", "dist\HMenu.bundle.lua", "KeySystem.lua",
     "categories\Atmosphere.lua", "categories\Combat.lua", "categories\Credits.lua",
     "categories\Emotes.lua", "categories\Farm.lua", "categories\Main.lua",
     "categories\Misc.lua", "categories\Player.lua", "categories\Teleport.lua",

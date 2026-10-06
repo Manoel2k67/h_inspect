@@ -530,7 +530,7 @@ function Inspector:Create(options)
             for index, instance in ipairs(descendants) do
                 if isGuiDatum(instance) then
                     local topGui = instance:FindFirstAncestorOfClass("ScreenGui")
-                    local isInspector = topGui and (topGui.Name == "HInspect" or topGui.Name == "HInspectKeySystem")
+                    local isInspector = topGui and topGui.Name == "HInspect"
                     if not isInspector and (settings.IncludeHiddenGui or effectivelyVisible(instance)) then
                         local textValue = (instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox"))
                             and instance.Text or ""
@@ -798,7 +798,7 @@ function Inspector:Create(options)
                     scanned = scanned + 1
                     local path = fullName(instance)
                     local topGui = instance:FindFirstAncestorOfClass("ScreenGui")
-                    local isInspector = topGui and (topGui.Name == "HInspect" or topGui.Name == "HInspectKeySystem")
+                    local isInspector = topGui and topGui.Name == "HInspect"
                     if not isInspector and isSnapshotCandidate(instance, path, scope, filter) then
                         items[path] = specialInstanceDetails(instance, true)
                         count = count + 1

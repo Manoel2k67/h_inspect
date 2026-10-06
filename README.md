@@ -58,7 +58,7 @@ Se o servidor nunca replica a informação real/falso para o cliente, nenhum exe
 ## Arquitetura
 
 ```text
-KeySystem.lua                 entrada pública, chave e download do bundle
+Loader.lua                    entrada pública direta e download do bundle
 HInspect.lua                  janela, controles, navegação, temas e ciclo de vida
 HInspectConfig.lua            identidade, tema, tamanho, atalhos e categorias
 HInspectSchema.lua            contratos das definições
@@ -91,57 +91,28 @@ O bundle é gerado e não deve ser editado manualmente. Todos os textos permanec
 
 ## Publicar no GitHub
 
-As URLs atuais esperam um repositório público chamado `Manoel2k67/hinspect`, branch `main`.
+As URLs atuais usam o repositório público `Manoel2k67/h_inspect`, branch `main`.
 
 ```powershell
 git init
 git branch -M main
 git add .
-git commit -m "H Inspect 2.1.0"
-git remote add origin https://github.com/Manoel2k67/hinspect.git
+git commit -m "H Inspect 2.2.0 - loader direto"
+git remote add origin https://github.com/Manoel2k67/h_inspect.git
 git push -u origin main
 ```
 
-Se o usuário ou nome do repositório for diferente, altere `REPOSITORIES` em `KeySystem.lua` e os exemplos abaixo antes de publicar. Confirme que estes endereços abrem como texto:
+Se o usuário ou nome do repositório for diferente, altere `REPOSITORIES` em `Loader.lua`. Confirme que estes endereços abrem como texto:
 
-- `https://raw.githubusercontent.com/Manoel2k67/hinspect/main/VERSION`
-- `https://raw.githubusercontent.com/Manoel2k67/hinspect/main/dist/HInspect.bundle.lua`
+- `https://raw.githubusercontent.com/Manoel2k67/h_inspect/main/VERSION`
+- `https://raw.githubusercontent.com/Manoel2k67/h_inspect/main/dist/HInspect.bundle.lua`
 
 ## Rodar no executor
 
-### Teste direto, sem chave
-
-Use durante o desenvolvimento, depois que os arquivos estiverem no GitHub:
+O carregamento é direto. Não existe chave, senha, API de licença ou tela de validação:
 
 ```lua
-local repositories = {
-    "https://raw.githubusercontent.com/Manoel2k67/hinspect/main/",
-    "https://cdn.jsdelivr.net/gh/Manoel2k67/hinspect@main/",
-}
-
-local version = game:HttpGet(repositories[1] .. "VERSION?dev=" .. tostring(os.time()), true)
-    :match("^%s*(%d+%.%d+%.%d+)%s*$")
-assert(version, "VERSION inválida")
-_G.__HINSPECT_RELEASE_VERSION = version
-
-local source = game:HttpGet(repositories[1] .. "dist/HInspect.bundle.lua?v=" .. version, true)
-local chunk, compileError = loadstring(source, "@HInspect/dist/HInspect.bundle.lua")
-assert(chunk, compileError)
-local bundle = chunk()
-return bundle:Create({ AssetBaseUrls = repositories, AssetVersion = version })
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/h_inspect/main/Loader.lua", true))()
 ```
 
-### Carregamento com chave
-
-Depois de cadastrar o produto `h-inspect` no backend de licenças:
-
-```lua
-loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/Manoel2k67/hinspect/main/KeySystem.lua",
-    true
-))()
-```
-
-O `KeySystem.lua` usa o slug `h-inspect`. Chaves do produto antigo não funcionarão até esse novo produto existir no backend. Confirme também `LICENSE_API_URL` e `GET_KEY_URL` antes da primeira release pública.
-
-Um bundle público sempre pode ser baixado diretamente. O sistema de chave serve como controle de acesso do carregador, não como proteção absoluta do código cliente; nunca coloque segredos no script ou no repositório.
+O `Loader.lua` lê a versão publicada, tenta GitHub Raw e jsDelivr, baixa o bundle e abre o H Inspect imediatamente.
