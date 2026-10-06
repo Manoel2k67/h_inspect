@@ -37,6 +37,8 @@ Isso encontra tanto cargos salvos em atributos/time quanto cargos exibidos apena
 
 ### Comparar vidros reais e falsos
 
+No Squid Game X, a estrutura observada fica em `Workspace.Map.Glass.Glasses`. Cada par possui dois lados, e a coleta confirmou esta regra para painéis intactos: `CanCollide=true` indica vidro real/seguro; `CanCollide=false` indica vidro falso/quebrável. `Size.Z` maior (`0.50+`) ou fino (`0.05`) serve como confirmação adicional. Um painel já quebrado pode ser movido para `Y=-11000` e perder o `TouchInterest`.
+
 1. Em **Comparar**, selecione **Vidros e mapa** e deixe o filtro vazio. Isso inclui nomes relacionados e peças cujo material é `Glass`.
 2. Antes de receber a visão especial ou entrar na ponte, clique em **Salvar snapshot A**.
 3. Quando o cargo de fabricante de vidro estiver ativo ou a ponte for carregada, clique em **Comparar**.
@@ -45,7 +47,7 @@ Isso encontra tanto cargos salvos em atributos/time quanto cargos exibidos apena
 
 Na aba **Mapa**, selecione **Vidros e ponte**, faça a varredura e use **Copiar relatório do mapa**. Os IDs `G001`, `G002` etc. representam grupos com as mesmas propriedades e filhos diretos. Se os painéis reais e falsos tiverem diferenças replicadas, eles devem aparecer em grupos distintos ou com contexto/filhos diferentes.
 
-Se o servidor nunca replica a informação real/falso para o cliente, nenhum executor consegue lê-la diretamente. Se o fabricante recebe cor, destaque, atributo, valor ou interface local diferente, o snapshot deve revelar essa diferença.
+Essa regra é específica da estrutura atualmente observada no Squid Game X e deve ter fallback: se o caminho ou as propriedades mudarem, o menu deve parar de classificar e solicitar uma nova coleta, em vez de apresentar um resultado possivelmente incorreto.
 
 ## Categorias
 

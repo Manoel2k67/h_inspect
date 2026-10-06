@@ -2,7 +2,7 @@
 
 Este documento reúne o que o **H Inspect** conseguiu observar no jogo **Squid Game X** e transforma a coleta bruta em uma referência para desenvolver menus específicos depois.
 
-> Estado atual: análise em andamento, com **dois snapshots únicos**. Os dois primeiros arquivos enviados eram cópias idênticas; o relatório de `15:53:09Z` é uma nova amostra. As coletas mostram estados do Red Light, Green Light e áreas comuns, mas ainda não contêm as peças da ponte de vidro.
+> Estado atual: análise em andamento. Além dos snapshots iniciais, uma coleta complementar confirmou a estrutura física da ponte e a diferença replicada entre vidro real e falso.
 
 ## Identificação da amostra
 
@@ -33,7 +33,7 @@ O jogo usa uma combinação de `Team`, atributos no objeto `Player`, ferramentas
 | Guarda Círculo | `GuardRank="Circle"`, `ChatTag="CIRCLE GUARD"` | Confirmado |
 | Guarda Triângulo | `GuardRank="Triangle"`, `ChatTag="TRIANGLE GUARD"` | Confirmado |
 | Frontman/Officer | `IsFrontman=true` como sinal principal; `GlassVision` e estados `FRONTMAN_*` como sinais adicionais | Confirmado; time e atributos de guarda variam por fase |
-| Visão de vidro | `GlassVision=true` | Atributo confirmado; efeito exato ainda provável |
+| Visão de vidro | `GlassVision=true` | Atributo confirmado; é separado de `GlassMaker` |
 | Glass Maker | `GlassMaker=true` em um único jogador e UI `Main.Chances.Glassmaker` | Identificação do sorteado confirmada; somente ele vê os vidros na final |
 | Detetive | Interface `PlayerGui.DetectivePick.DetectivePick` e evidências em `Workspace.Data.Detective` | Mecânica confirmada; atributo do jogador desconhecido |
 
@@ -41,12 +41,14 @@ O jogo usa uma combinação de `Team`, atributos no objeto `Player`, ferramentas
 
 Foram observados vários exemplos úteis:
 
-- Guarda Círculo: `Team="Guard"`, `IsGuard=true`, `GuardRank="Circle"`, `LockerRoom="Room2"`, `SafeCharacter=true` e item `MPS-5`.
+- Guarda Círculo: `Team="Guard"`, `IsGuard=true`, `GuardRank="Circle"`, `ChatTag="CIRCLE GUARD"`, `SafeCharacter=true` e item `MPS-5`.
 - Guarda Triângulo: `Team="Guard"`, `IsGuard=true`, `GuardRank="Triangle"`, `LockerRoom="Room4"`, `SafeCharacter=true` e item `MPS-5`.
 - Officer/Frontman: `Team="Guard"`, `IsGuard=true`, `GuardRank="Officer"`, `IsFrontman=true`, `ChatTag="FRONTMAN"` e item `Revolver`.
 - A arma exposta no personagem possui `WeaponType="BulletWeapon"`.
 
-Na segunda amostra, guardas Círculo apareceram nos quartos `Room1`, `Room4` e `Room7`; na primeira, outro estava em `Room2`. Portanto, `LockerRoom` parece ser uma alocação de quarto, não um identificador confiável de patente. (editado pelo Manoel criador das analises> Isso mesmo o room é um quarto onde o guarda spawna.)
+Guardas Círculo apareceram em `Room1`, `Room2`, `Room4`, `Room7` e `Room9`. Portanto, `LockerRoom` é o quarto onde o guarda nasce e não deve ser usado como identificador de patente.
+
+Os atributos físicos variaram entre amostras. Um Guarda Círculo foi observado com `100/100` de vida e `JumpHeight=7.2`; outra amostra apresentou `110/110` e aproximadamente `8.2`. O menu deve exibir os valores atuais, sem assumir que vida ou pulo identificam o cargo. A `MPS-5` confirmou `AmmoCapacity=30`, `HitDamage=10` e `ShotCooldown=0.2`.
 
 Também existem dados de progressão de cargo na interface local:
 
@@ -105,7 +107,7 @@ IsGuard/GuardRank = ausentes nessa amostra
 
 Portanto, `IsFrontman=true` deve ser o detector principal. `Team="Guard"`, `IsGuard`, `GuardRank="Officer"` e `ChatTag="FRONTMAN"` apareceram em outra amostra, mas não são garantidos em todas as fases.
 
-Esse Frontman tinha `150/150` de vida, `JumpHeight=10.2` e `WalkSpeed=12`, enquanto o Glass Maker inspecionado anteriormente tinha `100/100`, `JumpHeight=7.2` e a mesma velocidade. Isso indica bônus de vida e pulo associado ao Frontman nessa amostra.
+Esse Frontman tinha `150/150` de vida, `JumpHeight=10.2` e `WalkSpeed=12`. O Glass Maker apareceu com `100/100` em uma amostra e `130/130` em outra. Esses valores podem refletir bônus, progressão ou estado da rodada; não devem substituir `IsFrontman` e `GlassMaker` como detectores.
 
 Também estavam simultaneamente presentes `PlayingGlass=true`, `PlayingRLGL=true`, `FRONTMAN_RLGL=true` e `HONEYCOMB_SHAPE="Triangle"`. Alguns atributos de fases anteriores permanecem no jogador; o menu não deve considerar `PlayingRLGL` ou o prefixo da habilidade isoladamente como prova da fase atual. Quando `PlayingGlass=true`, ele é o sinal mais específico para a ponte.
 
@@ -187,6 +189,13 @@ Cada minigame fica em um modelo próprio dentro de `Workspace.Map`:
 | Red Light, Green Light | `Workspace.Map.RedLightGreenLight` | Confirmado |
 | Ponte de vidro | `Workspace.Map.Glass` | Confirmado |
 | Cadeiras Musicais | `Workspace.Map.MusicalChairs` | Confirmado |
+
+Teleportes de entrada observados na escada:
+
+```text
+Workspace.Staircase.TPs.Glass.Teleport
+Workspace.Staircase.TPs.MusicalChairs.Teleport
+```
 
 ## Red Light, Green Light
 
@@ -397,71 +406,82 @@ A tela de itens encontrou 20 ferramentas e 34 acessórios/objetos anexados. Nos 
 
 ## Ponte de vidro
 
-As amostras atuais **não contêm as peças da ponte**. A busca de Interface por `glass` encontrou 24 elementos, mas eles são principalmente a chance do Glass Maker e telas/gamepasses; ela não examina os painéis físicos do mapa. Por isso ainda não é possível indicar com segurança:
+### Estrutura confirmada dos painéis
 
-- qual propriedade diferencia vidro real e falso;
-- nomes e caminhos dos painéis;
-- se a diferença está em atributo, tag, material, transparência, colisão ou script;
-- como `GlassVision` altera as peças ou a interface;
-- se a solução fica em `Workspace`, `ReplicatedStorage` ou é criada dinamicamente.
-
-Os principais ganchos já encontrados são:
+O contêiner principal é:
 
 ```text
-GlassMaker = true
-GlassVision = true
+Workspace.Map.Glass.Glasses
 ```
 
-Na implementação futura, o menu deve mostrar os dois separadamente: **Fabricante sorteado** com base em `GlassMaker` e **Visão especial ativa** com base em `GlassVision`.
-
-O filtro automático de mapa também classificou alguns modelos de guardas como `vidro/ponte`, apesar de os resultados exibidos serem personagens. Isso deve ser tratado como ruído causado por algum descendente correspondente ao filtro, não como peça da ponte.
-
-### Amostra C — fase Glass ativa
-
-A terceira amostra confirmou `PlayingGlass=true` nos participantes vivos da ponte. Esse é o melhor sinal de fase encontrado até agora.
-
-O Frontman expôs um novo atributo:
+Dentro dele existem dez pares, com dois lados em cada par. A notação da coleta foi:
 
 ```text
-GlassVision = true
-FRONTMAN_GLASS_PAIR_SELECTION = 10
+Pair1/1   Pair1/2
+Pair2/1   Pair2/2
+...
+Pair10/1  Pair10/2
 ```
 
-`FRONTMAN_GLASS_PAIR_SELECTION` provavelmente representa o índice de um par selecionado pela mecânica do Frontman. O valor `10` não deve ser interpretado como lado seguro ou sequência da ponte sem uma comparação durante a interação.
+Aqui, `PairN/lado` representa o lado `1` ou `2` contido no par correspondente. O código deve enumerar os filhos dinamicamente, sem depender de uma quantidade fixa caso o jogo seja atualizado.
 
-A captura de mapa feita segundos antes do snapshot mostrou muitos resultados sob:
+### Regra real/falso confirmada
+
+| Propriedade | Vidro real/seguro | Vidro falso/quebrável |
+|---|---|---|
+| `CanCollide` | `true` | `false` |
+| `Size.Z` | maior, observado em `0.50+` | observado em `0.05` |
+| Material/cor | iguais | iguais |
+| `Transparency` | aproximadamente `0.55` | aproximadamente `0.55` |
+
+A classificação principal é:
 
 ```text
-Workspace.Data.Stairs.WorkspaceContainer.GlassGuard_Red.Animator.Touch.TouchInterest
+CanCollide == true  -> vidro real/seguro
+CanCollide == false -> vidro falso/quebrável
 ```
 
-Esse caminho confirma um modelo/controlador chamado `GlassGuard_Red` com interação por toque, mas não identifica os painéis reais ou falsos. A grande quantidade de resultados repetidos provavelmente veio de muitos descendentes dentro do mesmo modelo.
+`Size.Z` deve ser usado como confirmação adicional, não como única regra. Material, cor, transparência e a tag `Hidden` não diferenciaram os lados.
 
-No snapshot completo de `16:09:10Z`, a seção `MAPA — Vidros e ponte` retornou `Candidatos: 0`. Portanto, a estrutura observada segundos antes pode ter sido removida ou alterada durante a transição/final da fase. O relatório não preservou as peças da ponte.
+Quando um lado quebra, ele pode ser movido para uma coordenada `Y` muito baixa, como `-11000`, e perder o `TouchInterest`. O menu deve distinguir três estados:
 
-O jogador que tinha `GlassMaker=true` na amostra B não estava mais entre os 11 jogadores da amostra C. Assim, ainda não existe uma captura simultânea do fabricante e dos painéis.
+- **real intacto:** `CanCollide=true`;
+- **falso intacto:** `CanCollide=false`, `Size.Z` próximo de `0.05` e ainda na região da ponte;
+- **removido/quebrado:** posição `Y` muito baixa, ausência do `TouchInterest` ou objeto removido.
 
-A interface mostrou novamente a chance dinâmica:
+Outros caminhos confirmados da fase:
 
 ```text
-Glass Maker Luck: 9%
+Workspace.Map.Glass.Map.KillSecure
+Workspace.Map.Glass.NotCutscene.PassPart.GlassmakerPrompt
+Workspace.Staircase.TPs.Glass.Teleport
 ```
 
-Já foram observados `1%`, `3%` e `9%`, reforçando que esse número não é constante.
+`KillSecure` é uma zona de morte. `GlassmakerPrompt` pertence à passagem fora da cutscene, e o teleporte da escada leva à entrada da fase. `PlayingGlass=true` continua sendo o melhor atributo observado para detectar participantes da ponte.
 
-### Coleta recomendada para descobrir os vidros
+### Relação com Glass Maker e Frontman
 
-Na versão 2.4.0, a aba **Mapa** possui **Copiar relatório do mapa** e agrupa candidatos por assinatura (`G001`, `G002`...), pai/par, posição ordenada entre irmãos e filhos diretos. Isso permite comparar painéis sem depender de screenshots ou da prévia truncada.
+O menu deve mostrar separadamente:
 
-1. Entrar na fase da ponte com um jogador comum.
-2. Antes de pisar, salvar um snapshot de **Mapa** usando os filtros `glass`, `bridge`, `tile`, `panel` e `pane`.
-3. Salvar uma varredura de **Estrutura** em `ReplicatedStorage` com os mesmos filtros.
-4. Se possível, salvar o estado no Comparar como amostra A.
-5. Repetir como Glass Maker ou com `GlassVision=true` e salvar a amostra B.
-6. Comparar atributos, tags, cores, materiais, transparência, colisão, nomes e filhos de cada painel.
-7. Coletar novamente depois que um vidro quebrar para identificar a mudança de estado.
+- **Fabricante sorteado:** `GlassMaker=true`;
+- **Visão especial ativa:** `GlassVision=true`;
+- **Fase da ponte:** `PlayingGlass=true`;
+- **Seleção do Frontman:** `FRONTMAN_GLASS_PAIR_SELECTION`.
 
-Para essa fase, aumente o limite da coleta de mapa para cerca de 200 resultados. O relatório atual exibiu apenas os primeiros 80 candidatos de 489, então objetos importantes podem ter ficado fora do texto.
+`FRONTMAN_GLASS_PAIR_SELECTION` representa um índice de par observado, mas não deve ser usado como lado seguro. A regra física `CanCollide` é a evidência direta para classificar os painéis.
+
+### Implementação recomendada
+
+1. Aguardar `Workspace.Map.Glass.Glasses` existir.
+2. Enumerar cada `Pair` e seus dois lados.
+3. Localizar a `BasePart` relevante de cada lado.
+4. Classificar primeiro por `CanCollide` e validar com `Size.Z`.
+5. Atualizar quando filhos forem adicionados/removidos ou quando propriedades mudarem.
+6. Não salvar coordenadas ou referências entre rodadas, pois o mapa pode ser recriado.
+
+O H Inspect 2.4.0 pode confirmar essa estrutura usando **Mapa → Vidros e ponte** e os filtros `Glasses, Pair`. O botão **Copiar relatório do mapa** preserva `CanCollide`, tamanho, caminho, pai/par e filhos diretos.
+
+Buscas genéricas por `glass` ainda encontram óculos e outros falsos positivos. Os filtros `Glasses` e `Pair` são mais específicos para a ponte.
 
 ## Jump Rope — fase da corda
 
@@ -601,6 +621,8 @@ A varredura de mapa em foco `Tudo` retornou centenas de interações gerais, pri
 - `GlassVision` e `GlassMaker` são atributos distintos.
 - O filtro genérico `glass` no H Inspect traz muitos falsos positivos (óculos de avatar, cones etc.). Os filtros `Glasses` ou `Pair` são mais limpos.
 - A tag `Hidden` aparece nos painéis da ponte, mas **não diferencia painel real de falso**.
+- Nos painéis intactos observados, `CanCollide` diferencia os lados: `true` é real e `false` é falso; `Size.Z` ajuda a confirmar.
+- Um painel quebrado pode ser movido para `Y=-11000` e perder o `TouchInterest`, então deve ser marcado como removido em vez de reclassificado apenas pela colisão.
 
 ## Arquitetura sugerida para um menu específico
 
@@ -610,7 +632,7 @@ Com base no que já foi confirmado, um futuro menu para o Squid Game X pode ser 
 2. **Estado da fase** — mostrar `PlayingRLGL`, `IsInsideRLGL`, segurança, vencedor, penalidades, proteção e cooldowns.
 3. **Itens** — informar ferramentas na mão e na mochila, incluindo `Push`, `MPS-5` e `Revolver`.
 4. **Portas** — registrar `DoorAccess`, forma exigida, prompts e caminho físico correspondente.
-5. **Ponte de vidro** — identificar painéis e diferenças entre estado normal e `GlassVision` após a coleta A/B.
+5. **Ponte de vidro** — listar os pares, marcar lado real/falso por `CanCollide`, validar com `Size.Z` e acompanhar painéis quebrados.
 6. **Interações** — catálogo de elevadores, CCTV, incinerador, guarda-roupa e pickups.
 7. **Diagnóstico** — exibir caminho completo, classe, atributos, tags e alterações em tempo real.
 
@@ -671,11 +693,13 @@ Use o filtro na categoria correta:
 - registro das portas `Square+` e `Triangle+`;
 - registro dinâmico das evidências do Detetive;
 - catálogo das interações já encontradas.
+- detector da fase Glass por `PlayingGlass`;
+- resolução dos pares da ponte por `CanCollide`, com confirmação por `Size.Z`;
+- detecção de painel quebrado por posição muito baixa, remoção ou perda de `TouchInterest`.
 
 ### Precisa de novas amostras
 
-- regra real/falso da ponte;
-- confirmação do funcionamento de `GlassVision`;
+- efeito visual exato aplicado por `GlassVision` no cliente;
 - momento exato em que o jogo concede `GlassVision` ao jogador com `GlassMaker=true`;
 - atributos e escolhas do Detetive;
 - acesso do Guarda Círculo;
@@ -701,4 +725,4 @@ Para cada descoberta, guarde o caminho completo, classe da instância, atributos
 
 ---
 
-Última análise deste documento: `2026-10-06`. Fonte: dois snapshots únicos do H Inspect. Os dois primeiros arquivos recebidos eram duplicados; a coleta de `15:53:09Z` é uma segunda amostra independente.
+Última análise deste documento: `2026-10-06`. As descobertas combinam os snapshots do H Inspect com a coleta complementar que confirmou a estrutura e a colisão dos painéis da ponte.
