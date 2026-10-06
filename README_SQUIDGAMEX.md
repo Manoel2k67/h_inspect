@@ -407,6 +407,8 @@ Já foram observados `1%`, `3%` e `9%`, reforçando que esse número não é con
 
 ### Coleta recomendada para descobrir os vidros
 
+Na versão 2.4.0, a aba **Mapa** possui **Copiar relatório do mapa** e agrupa candidatos por assinatura (`G001`, `G002`...), pai/par, posição ordenada entre irmãos e filhos diretos. Isso permite comparar painéis sem depender de screenshots ou da prévia truncada.
+
 1. Entrar na fase da ponte com um jogador comum.
 2. Antes de pisar, salvar um snapshot de **Mapa** usando os filtros `glass`, `bridge`, `tile`, `panel` e `pane`.
 3. Salvar uma varredura de **Estrutura** em `ReplicatedStorage` com os mesmos filtros.

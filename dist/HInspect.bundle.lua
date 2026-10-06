@@ -1615,6 +1615,7 @@ return {
                 { Kind = "Input", Setting = "WorldFilter", Id = "world_filter", Label = "Filtro adicional", Placeholder = "glass, bridge, door, nome...", Default = "" },
                 { Kind = "Slider", Setting = "MaxWorldResults", Id = "max_world_results", Label = "Máximo de resultados", Min = 20, Max = 200, Default = 80, Step = 10 },
                 { Kind = "Button", Setting = "ScanWorld", Id = "scan_world", Label = "Varrer mapa agora", Description = "Lê cor, material, transparência local, colisão, tags, atributos e prompts.", ButtonText = "Varrer" },
+                { Kind = "Button", Setting = "CopyWorldReport", Id = "copy_world_report", Label = "Copiar relatório do mapa", Description = "Copia a coleta completa, incluindo assinaturas, pais, irmãos e filhos dos candidatos.", ButtonText = "Copiar" },
             },
         },
         {
@@ -1724,6 +1725,21 @@ end
 
 local function normalizedFilter(value)
     return string.lower(tostring(value or "")):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function matchesCommaFilter(searchable, filter)
+    local normalized = normalizedFilter(filter)
+    if normalized == "" then return true end
+    local lowered = string.lower(tostring(searchable or ""))
+    local foundTerm = false
+    for term in string.gmatch(normalized, "[^,;]+") do
+        term = term:gsub("^%s+", ""):gsub("%s+$", "")
+        if term ~= "" then
+            foundTerm = true
+            if string.find(lowered, term, 1, true) then return true end
+        end
+    end
+    return not foundTerm
 end
 
 local function isInspectionAttribute(attribute)
@@ -1867,6 +1883,8 @@ local function worldDetails(instance, detailed)
 
     if instance:IsA("BasePart") then
         table.insert(details, "size=" .. formatValue(instance.Size))
+        table.insert(details, "orientation=" .. formatValue(instance.Orientation))
+        if instance:IsA("Part") then table.insert(details, "shape=" .. tostring(instance.Shape)) end
         table.insert(details, "material=" .. tostring(instance.Material))
         table.insert(details, "color=" .. formatValue(instance.Color))
         table.insert(details, "transparency=" .. tostring(instance.Transparency))
@@ -1876,6 +1894,7 @@ local function worldDetails(instance, detailed)
         table.insert(details, "touch=" .. tostring(instance.CanTouch))
         table.insert(details, "query=" .. tostring(instance.CanQuery))
         table.insert(details, "anchored=" .. tostring(instance.Anchored))
+        table.insert(details, "massless=" .. tostring(instance.Massless))
         table.insert(details, "castShadow=" .. tostring(instance.CastShadow))
         table.insert(details, "collisionGroup=" .. tostring(instance.CollisionGroup))
         table.insert(details, "materialVariant=" .. string.format("%q", oneLine(instance.MaterialVariant)))
@@ -1900,6 +1919,136 @@ local function worldDetails(instance, detailed)
         if #attributes > 0 then table.insert(details, "attrs={" .. table.concat(attributes, "; ") .. "}") end
     end
     return table.concat(details, " | ")
+end
+
+local function directChildren(instance)
+    local ok, children = pcall(function() return instance:GetChildren() end)
+    return ok and children or {}
+end
+
+local function descendantCount(instance)
+    local ok, descendants = pcall(function() return instance:GetDescendants() end)
+    return ok and #descendants or 0
+end
+
+local function siblingPosition(instance)
+    local parent = instance.Parent
+    if not parent then return 0, 0 end
+    local siblings = directChildren(parent)
+    table.sort(siblings, function(a, b)
+        local aName, bName = string.lower(a.Name), string.lower(b.Name)
+        if aName == bName then return a.ClassName < b.ClassName end
+        return aName < bName
+    end)
+    for index, sibling in ipairs(siblings) do
+        if sibling == instance then return index, #siblings end
+    end
+    return 0, #siblings
+end
+
+local function nearestModelPath(instance)
+    local current = instance.Parent
+    while current and current ~= Workspace do
+        if current:IsA("Model") then return fullName(current) end
+        current = current.Parent
+    end
+    return "nenhum"
+end
+
+local function childSummary(instance, maximum)
+    local descriptions = {}
+    local children = directChildren(instance)
+    table.sort(children, function(a, b)
+        local aKey = string.lower(a.Name) .. "\0" .. a.ClassName
+        local bKey = string.lower(b.Name) .. "\0" .. b.ClassName
+        return aKey < bKey
+    end)
+    for index, child in ipairs(children) do
+        if index > maximum then break end
+        local description = child.Name .. "<" .. child.ClassName .. ">"
+        if child:IsA("ValueBase") then
+            local ok, value = pcall(function() return child.Value end)
+            if ok then description = description .. "=" .. formatValue(value) end
+        end
+        local tags = readTags(child)
+        if #tags > 0 then description = description .. " tags={" .. table.concat(tags, ",") .. "}" end
+        local attributes = readAttributes(child)
+        if #attributes > 0 then description = description .. " attrs={" .. table.concat(attributes, ";") .. "}" end
+        table.insert(descriptions, description)
+    end
+    if #children > maximum then
+        table.insert(descriptions, string.format("... +%d filhos", #children - maximum))
+    end
+    return #children > 0 and table.concat(descriptions, ", ") or "nenhum"
+end
+
+local function containerSignalSummary(instance)
+    if not instance then return "nenhum" end
+    local signals = { "class=" .. instance.ClassName }
+    local tags = readTags(instance)
+    if #tags > 0 then table.insert(signals, "tags={" .. table.concat(tags, ",") .. "}") end
+    local attributes = readAttributes(instance)
+    if #attributes > 0 then table.insert(signals, "attrs={" .. table.concat(attributes, ";") .. "}") end
+    local values = {}
+    for _, child in ipairs(directChildren(instance)) do
+        if child:IsA("ValueBase") then
+            local ok, value = pcall(function() return child.Value end)
+            if ok then table.insert(values, child.Name .. "=" .. formatValue(value)) end
+        end
+    end
+    table.sort(values)
+    if #values > 0 then table.insert(signals, "values={" .. table.concat(values, ";") .. "}") end
+    return table.concat(signals, " | ")
+end
+
+-- A assinatura ignora nome, caminho e posição. Objetos visualmente iguais ficam
+-- no mesmo grupo; qualquer diferença replicada de vidro real/falso tende a criar
+-- grupos distintos e fica mais fácil de comparar no relatório copiado.
+local function worldFingerprint(instance)
+    local values = { "class=" .. instance.ClassName }
+    if instance:IsA("BasePart") then
+        table.insert(values, "size=" .. formatValue(instance.Size))
+        table.insert(values, "material=" .. tostring(instance.Material))
+        table.insert(values, "color=" .. formatValue(instance.Color))
+        table.insert(values, "transparency=" .. tostring(instance.Transparency))
+        table.insert(values, "localTransparency=" .. tostring(instance.LocalTransparencyModifier))
+        table.insert(values, "reflectance=" .. tostring(instance.Reflectance))
+        table.insert(values, "collide=" .. tostring(instance.CanCollide))
+        table.insert(values, "touch=" .. tostring(instance.CanTouch))
+        table.insert(values, "query=" .. tostring(instance.CanQuery))
+        table.insert(values, "anchored=" .. tostring(instance.Anchored))
+        table.insert(values, "castShadow=" .. tostring(instance.CastShadow))
+        table.insert(values, "collisionGroup=" .. tostring(instance.CollisionGroup))
+        table.insert(values, "materialVariant=" .. oneLine(instance.MaterialVariant))
+        if instance:IsA("MeshPart") then
+            table.insert(values, "meshId=" .. oneLine(instance.MeshId))
+            table.insert(values, "textureId=" .. oneLine(instance.TextureID))
+        end
+    elseif instance:IsA("ValueBase") then
+        local ok, value = pcall(function() return instance.Value end)
+        if ok then table.insert(values, "value=" .. formatValue(value)) end
+    end
+    local tags = readTags(instance)
+    if #tags > 0 then table.insert(values, "tags=" .. table.concat(tags, ",")) end
+    local attributes = readAttributes(instance)
+    if #attributes > 0 then table.insert(values, "attrs=" .. table.concat(attributes, ";")) end
+
+    local childShapes = {}
+    for _, child in ipairs(directChildren(instance)) do
+        local shape = child.ClassName .. ":" .. child.Name
+        if child:IsA("ValueBase") then
+            local ok, value = pcall(function() return child.Value end)
+            if ok then shape = shape .. "=" .. formatValue(value) end
+        end
+        local childTags = readTags(child)
+        if #childTags > 0 then shape = shape .. "#" .. table.concat(childTags, ",") end
+        local childAttributes = readAttributes(child)
+        if #childAttributes > 0 then shape = shape .. "@" .. table.concat(childAttributes, ";") end
+        table.insert(childShapes, shape)
+    end
+    table.sort(childShapes)
+    table.insert(values, "children=" .. table.concat(childShapes, ","))
+    return table.concat(values, "|")
 end
 
 local function specialInstanceDetails(instance, detailed)
@@ -2517,13 +2666,22 @@ function Inspector:Create(options)
         local interaction = instance:IsA("ProximityPrompt") or instance:IsA("ClickDetector")
             or instance:IsA("TouchTransmitter") or containsAny(searchable, INTERACTION_WORDS)
         local focus = settings.WorldFocus
+        if focus == "Vidros e ponte" then
+            local current = instance
+            while current and current ~= Workspace do
+                if current:IsA("Accessory") or current:IsA("Tool")
+                    or (current:IsA("Model") and current:FindFirstChildOfClass("Humanoid")) then
+                    return nil, 0
+                end
+                current = current.Parent
+            end
+        end
         local accepted = (focus == "Tudo" and (door or glass or interaction))
             or (focus == "Portas e saídas" and door)
             or (focus == "Vidros e ponte" and glass)
             or (focus == "Interações" and interaction)
         if not accepted then return nil, 0 end
-        local filter = normalizedFilter(settings.WorldFilter)
-        if filter ~= "" and not string.find(string.lower(searchable), filter, 1, true) then
+        if not matchesCommaFilter(searchable, settings.WorldFilter) then
             return nil, 0
         end
 
@@ -2545,7 +2703,13 @@ function Inspector:Create(options)
             local path = fullName(instance)
             local kind, score = candidateKind(instance, path)
             if kind then
-                table.insert(candidates, { Instance = instance, Path = path, Kind = kind, Score = score })
+                table.insert(candidates, {
+                    Instance = instance,
+                    Path = path,
+                    Kind = kind,
+                    Score = score,
+                    Fingerprint = worldFingerprint(instance),
+                })
             end
             if index % 750 == 0 then
                 update("world_status", "Varrendo mapa...", string.format("%d de %d instâncias lidas", index, #descendants))
@@ -2558,16 +2722,93 @@ function Inspector:Create(options)
         end)
 
         local maximum = math.min(settings.MaxWorldResults, #candidates)
+        local fingerprints = {}
+        local parentGroups = {}
+        for _, entry in ipairs(candidates) do
+            local fingerprint = fingerprints[entry.Fingerprint]
+            if not fingerprint then
+                fingerprint = { Count = 0, Samples = {}, Kind = entry.Kind }
+                fingerprints[entry.Fingerprint] = fingerprint
+            end
+            fingerprint.Count = fingerprint.Count + 1
+            if #fingerprint.Samples < 3 then table.insert(fingerprint.Samples, entry.Path) end
+
+            local parentPath = entry.Instance.Parent and fullName(entry.Instance.Parent) or "sem pai"
+            parentGroups[parentPath] = (parentGroups[parentPath] or 0) + 1
+        end
+
+        local fingerprintList = {}
+        for signature, group in pairs(fingerprints) do
+            table.insert(fingerprintList, { Signature = signature, Group = group })
+        end
+        table.sort(fingerprintList, function(a, b)
+            if a.Group.Count == b.Group.Count then return a.Signature < b.Signature end
+            return a.Group.Count > b.Group.Count
+        end)
+        local fingerprintIds = {}
+        for index, item in ipairs(fingerprintList) do
+            local id = string.format("G%03d", index)
+            fingerprintIds[item.Signature] = id
+            item.Id = id
+        end
+
+        local parentList = {}
+        for path, count in pairs(parentGroups) do
+            table.insert(parentList, { Path = path, Count = count })
+        end
+        table.sort(parentList, function(a, b)
+            if a.Count == b.Count then return string.lower(a.Path) < string.lower(b.Path) end
+            return a.Count > b.Count
+        end)
+
         local lines = {
             sessionHeader("MAPA — " .. settings.WorldFocus),
             "",
-            string.format("Candidatos: %d | exibindo: %d", #candidates, maximum),
+            string.format("Filtro: %s", settings.WorldFilter ~= "" and settings.WorldFilter or "(nenhum)"),
+            string.format("Candidatos: %d | exibindo: %d | assinaturas distintas: %d",
+                #candidates, maximum, #fingerprintList),
             "",
         }
+        if #fingerprintList > 0 then
+            table.insert(lines, "GRUPOS DE ASSINATURA (mesmas propriedades e filhos diretos)")
+            for index, item in ipairs(fingerprintList) do
+                if index > 30 then
+                    table.insert(lines, string.format("... +%d grupos omitidos neste resumo", #fingerprintList - 30))
+                    break
+                end
+                table.insert(lines, string.format("  %s | quantidade=%d | tipo=%s",
+                    item.Id, item.Group.Count, item.Group.Kind))
+                for _, sample in ipairs(item.Group.Samples) do
+                    table.insert(lines, "       exemplo: " .. sample)
+                end
+            end
+            table.insert(lines, "")
+        end
+        if #parentList > 0 then
+            table.insert(lines, "AGRUPAMENTO POR PAI/PAR")
+            for index, item in ipairs(parentList) do
+                if index > 30 then
+                    table.insert(lines, string.format("... +%d pais omitidos neste resumo", #parentList - 30))
+                    break
+                end
+                table.insert(lines, string.format("  quantidade=%d | %s", item.Count, item.Path))
+            end
+            table.insert(lines, "")
+        end
+        table.insert(lines, "DETALHES DOS CANDIDATOS")
         for index = 1, maximum do
             local entry = candidates[index]
-            table.insert(lines, string.format("%03d. [%s] %s", index, entry.Kind, entry.Path))
+            local siblingIndex, siblingCount = siblingPosition(entry.Instance)
+            table.insert(lines, string.format("%03d. [%s] [%s] %s",
+                index, entry.Kind, fingerprintIds[entry.Fingerprint] or "G???", entry.Path))
             table.insert(lines, "     " .. specialInstanceDetails(entry.Instance, settings.ReportDetail == "Detalhado"))
+            table.insert(lines, string.format(
+                "     contexto: pai=%s | irmãoOrdenado=%d/%d | modelo=%s | filhos=%d | descendentes=%d",
+                entry.Instance.Parent and fullName(entry.Instance.Parent) or "nil",
+                siblingIndex, siblingCount, nearestModelPath(entry.Instance),
+                #directChildren(entry.Instance), descendantCount(entry.Instance)))
+            table.insert(lines, "     sinaisDoPai: " .. containerSignalSummary(entry.Instance.Parent))
+            table.insert(lines, "     filhosDiretos: " .. childSummary(entry.Instance, 16))
         end
         if maximum == 0 then
             table.insert(lines, "Nenhum candidato encontrado com o foco atual.")
@@ -2878,6 +3119,11 @@ function Inspector:Create(options)
             "Inspecione o jogador selecionado antes de copiar.")
     end
 
+    local function copyWorldReport()
+        copyText(lastWorldReport, "world_status",
+            "Faça uma varredura do mapa antes de copiar.")
+    end
+
     function runtime:GetOptions(source)
         if source == "PlayerTargets" then return playerTargetOptions() end
         return {}
@@ -2915,6 +3161,8 @@ function Inspector:Create(options)
             scanGui(true)
         elseif name == "ScanWorld" then
             scanWorld(true)
+        elseif name == "CopyWorldReport" then
+            copyWorldReport()
         elseif name == "ScanStructure" then
             scanStructure(true)
         elseif name == "CaptureBaseline" then

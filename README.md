@@ -9,7 +9,7 @@ As operações do H Inspect são somente de leitura: ele não abre portas, não 
 - **Jogadores:** nome, UserId, time, atributos, `ValueBase`, `leaderstats`, personagem e ferramentas.
 - **Itens:** `Tool` equipada ou na mochila, `Handle`, `Grip`, textura, atributos, valores, animações, sons, scripts e objetos de rede internos.
 - **Interface:** textos e imagens do `PlayerGui`, inclusive elementos invisíveis, com caminho, visibilidade, posição, tamanho, tags e atributos.
-- **Mapa:** portas, saídas, prompts, detectores, vidros, pontes, peças de material `Glass` e pistas visuais como `Highlight`, `SelectionBox`, decal, textura, `SurfaceAppearance`, `Beam` e GUI de mundo.
+- **Mapa:** portas, saídas, prompts, detectores, vidros, pontes, peças de material `Glass` e pistas visuais como `Highlight`, `SelectionBox`, decal, textura, `SurfaceAppearance`, `Beam` e GUI de mundo. A coleta agrupa objetos por assinatura e por pai/par, registra irmãos e filhos e pode ser copiada diretamente na aba.
 - **Estrutura:** busca livre em `ReplicatedStorage`, `Workspace`, `PlayerGui` ou personagem. Sem filtro, prioriza Values, Tools, remotes, módulos, prompts, tags e atributos.
 - **Comparação:** snapshot A e estado atual, destacando objetos adicionados, removidos ou alterados.
 - **Sessão:** `PlaceId`, `GameId`, `JobId` e horário UTC.
@@ -42,6 +42,8 @@ Isso encontra tanto cargos salvos em atributos/time quanto cargos exibidos apena
 3. Quando o cargo de fabricante de vidro estiver ativo ou a ponte for carregada, clique em **Comparar**.
 4. Procure mudanças em `Color`, `Material`, `Transparency`, `LocalTransparencyModifier`, colisão, tags e atributos, além de `Highlight`, decal, textura, `SelectionBox` ou `SurfaceGui`.
 5. Repita em **Interface** com `fabricante`, `glass` e `vidro` para descobrir indicadores locais.
+
+Na aba **Mapa**, selecione **Vidros e ponte**, faça a varredura e use **Copiar relatório do mapa**. Os IDs `G001`, `G002` etc. representam grupos com as mesmas propriedades e filhos diretos. Se os painéis reais e falsos tiverem diferenças replicadas, eles devem aparecer em grupos distintos ou com contexto/filhos diferentes.
 
 Se o servidor nunca replica a informação real/falso para o cliente, nenhum executor consegue lê-la diretamente. Se o fabricante recebe cor, destaque, atributo, valor ou interface local diferente, o snapshot deve revelar essa diferença.
 
@@ -99,7 +101,7 @@ As URLs atuais usam o repositório público `Manoel2k67/h_inspect`, branch `main
 git init
 git branch -M main
 git add .
-git commit -m "H Inspect 2.3.1 - inspeção individual"
+git commit -m "H Inspect 2.4.0 - mapa comparável"
 git remote add origin https://github.com/Manoel2k67/h_inspect.git
 git push -u origin main
 ```
