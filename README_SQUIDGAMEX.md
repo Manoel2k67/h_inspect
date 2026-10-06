@@ -191,12 +191,14 @@ Cada minigame fica em um modelo próprio dentro de `Workspace.Map`:
 | Ponte de vidro | `Workspace.Map.Glass` | Confirmado |
 | Cadeiras Musicais | `Workspace.Map.MusicalChairs` | Confirmado |
 
-Teleportes de entrada observados na escada:
+No **lobby da partida**, a escada possui destinos/entradas que encaminham os jogadores para as fases:
 
 ```text
 Workspace.Staircase.TPs.Glass.Teleport
 Workspace.Staircase.TPs.MusicalChairs.Teleport
 ```
+
+Esses caminhos pertencem ao lobby. Eles não fazem parte dos mapas físicos das fases e, em especial, `Workspace.Staircase.TPs.MusicalChairs.Teleport` não representa nenhuma cadeira nem a mecânica de sentar das Cadeiras Musicais.
 
 ## Red Light, Green Light
 
@@ -458,7 +460,7 @@ Workspace.Map.Glass.NotCutscene.PassPart.GlassmakerPrompt
 Workspace.Staircase.TPs.Glass.Teleport
 ```
 
-`KillSecure` é uma zona de morte. `GlassmakerPrompt` pertence à passagem fora da cutscene, e o teleporte da escada leva à entrada da fase. `PlayingGlass=true` continua sendo o melhor atributo observado para detectar participantes da ponte.
+`KillSecure` é uma zona de morte. `GlassmakerPrompt` pertence à passagem fora da cutscene. Já `Workspace.Staircase.TPs.Glass.Teleport` fica na escada do lobby e encaminha para a fase; ele não faz parte da ponte. `PlayingGlass=true` continua sendo o melhor atributo observado para detectar participantes da ponte.
 
 ### Relação com Glass Maker e Frontman
 
@@ -549,7 +551,88 @@ O caminho abaixo também apareceu:
 Workspace.Stairs.gm.TPs.Glass
 ```
 
-Pelo contexto e pelo trecho `TPs`, ele provavelmente representa um destino/teleporte para a fase Glass, não um painel real ou falso da ponte. Essa interpretação ainda deve ser confirmada.
+Pelo contexto e pelo trecho `TPs`, ele pertence ao sistema de encaminhamento do lobby para a fase Glass, não a um painel real ou falso da ponte e nem ao interior do mapa Glass. O caminho usa a forma antiga `Workspace.Stairs.gm`; a relação exata com `Workspace.Staircase.TPs.Glass.Teleport` ainda precisa ser confirmada.
+
+## Cadeiras Musicais
+
+O modelo confirmado da fase é:
+
+```text
+Workspace.Map.MusicalChairs
+```
+
+Uma coleta durante a disputa registrou duas notificações decisivas:
+
+| UTC | Remote | Mensagem | Estado interpretado |
+|---|---|---|---|
+| `22:57:43` | `ReplicatedStorage.Remotes.Notify` | `TAKE A SEAT!` | janela para procurar e ocupar uma cadeira |
+| `22:58:04` | `ReplicatedStorage.Remotes.Notify` | `Waiting for guards to clean up..` | disputa encerrada; limpeza dos eliminados |
+
+As mensagens ficaram separadas por aproximadamente `21` segundos nessa amostra. Isso não deve ser tratado como duração fixa até ser confirmado com `Remotes.Timer` em outras rodadas.
+
+Estados que um menu futuro pode representar:
+
+1. **Aguardando/música:** ainda não surgiu `TAKE A SEAT!`.
+2. **Sentar agora:** mensagem `TAKE A SEAT!` recebida; jogador sem cadeira corre risco de eliminação.
+3. **Sentado:** verificar no personagem local `Humanoid.Sit=true` e `Humanoid.SeatPart` diferente de `nil`.
+4. **Limpeza:** mensagem `Waiting for guards to clean up..` recebida.
+
+`Humanoid.Sit` e `SeatPart` são sinais recomendados da API do Roblox, mas ainda precisam ser registrados nesta experiência para confirmar se as cadeiras usam objetos `Seat` normais. Se usarem, cada cadeira também pode ser classificada como livre quando `Seat.Occupant=nil` ou ocupada quando `Occupant` aponta para um `Humanoid`.
+
+Coleta recomendada para confirmar as cadeiras físicas:
+
+- em **Estrutura**, usar escopo `Workspace` e filtros `MusicalChairs`, `chair`, `seat` e `occupant`;
+- inspecionar o próprio jogador antes e depois de sentar;
+- monitorar `Notify`, `Timer`, `GameStateUpdate` e `GamemodeAction` desde o começo da música até a limpeza;
+- copiar uma coleta quando a cadeira estiver livre e outra quando estiver ocupada.
+
+Com os dados atuais, já é possível planejar alertas de **SENTE AGORA**, estado local sentado/não sentado, contagem observada e indicação de cadeiras livres ou próximas quando a estrutura física for confirmada. A coleta não mostrou um remote específico de sentar.
+
+## Sistema de teleporte observado
+
+Há dois tipos de evidência relacionados às transições entre áreas.
+
+### Destinos físicos na escada do lobby
+
+```text
+Workspace.Staircase.TPs.Glass.Teleport
+Workspace.Staircase.TPs.MusicalChairs.Teleport
+```
+
+Essas peças ficam no **lobby da partida** e parecem representar destinos ou gatilhos usados para encaminhar jogadores às fases. Elas não pertencem ao interior de `Workspace.Map.Glass` ou `Workspace.Map.MusicalChairs`.
+
+O caminho `Workspace.Staircase.TPs.MusicalChairs.Teleport` não tem relação com as cadeiras utilizadas durante o evento. As cadeiras reais, a ocupação dos assentos e a eliminação de quem não sentar devem ser investigadas separadamente dentro de `Workspace.Map.MusicalChairs`.
+
+Como ainda não foram coletadas todas as propriedades e interações dessas peças do lobby, não está confirmado se o contato com elas inicia o teleporte ou se funcionam somente como marcadores de destino para scripts do servidor.
+
+### Remote recebido `SafeTP`
+
+O cliente recebeu chamadas como:
+
+```text
+ReplicatedStorage.Remotes.SafeTP(CFrame(8022.59, 90.83, 3730.97))
+ReplicatedStorage.Remotes.SafeTP(CFrame(-12604.93, -787.37, -2901.25))
+```
+
+O primeiro destino foi observado no retorno ao lobby; o segundo, antes do início de Red Light, Green Light. Isso mostra que o servidor envia ao cliente um `CFrame` de destino durante transições seguras.
+
+Fluxo observado:
+
+```text
+SetLighting(<fase>)
+→ SafeTP(<CFrame de destino>)
+→ GameStateUpdate("StartGamemode", <fase>)
+```
+
+No encerramento também apareceu:
+
+```text
+GameStateUpdate("EndGamemode", <fase>)
+→ SetLighting("Lobby")
+→ SafeTP(<CFrame do lobby>)
+```
+
+Essa é evidência de um comando **servidor → cliente**. Ela não revela o remote que o cliente eventualmente usa para solicitar entrada em uma fase e não confirma que uma chamada criada pelo cliente seria aceita. Para continuar a inspeção, monitorar `SafeTP`, `GameStateUpdate`, `SetLighting` e `GamemodeAction` ao entrar e sair de cada mapa, registrando o nome da fase e o `CFrame` recebido. Coordenadas devem permanecer como evidência de amostra, não como destinos fixos, pois os mapas podem ser recriados ou movidos.
 
 ## Jantar e combate com garfo
 
