@@ -116,7 +116,7 @@ As URLs atuais usam o repositório público `Manoel2k67/h_inspect`, branch `main
 git init
 git branch -M main
 git add .
-git commit -m "H Inspect 2.5.1 - argumentos remotos detalhados"
+git commit -m "H Inspect 2.5.2 - remotes compactados e booleanos"
 git remote add origin https://github.com/Manoel2k67/h_inspect.git
 git push -u origin main
 ```

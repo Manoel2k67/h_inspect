@@ -626,7 +626,7 @@ A varredura de mapa em foco `Tudo` retornou centenas de interações gerais, pri
 
 ## Coleta passiva de remotes
 
-O H Inspect 2.5.1 possui uma categoria **Remotes**. Ela separa duas tarefas:
+O H Inspect 2.5.2 possui uma categoria **Remotes**. Ela separa duas tarefas:
 
 - **Varrer remotes:** cataloga `RemoteEvent`, `UnreliableRemoteEvent` e `RemoteFunction`, com caminho, classe, atributos, tags e contexto do pai.
 - **Monitor passivo:** registra somente `OnClientEvent`, ou seja, mensagens que o servidor já enviou ao cliente. Não chama `FireServer` ou `InvokeServer`.
@@ -658,9 +658,9 @@ Uma coleta feita no final da partida revelou esta sequência:
 
 Isso indica um fluxo observável de limpeza da fase, atualização do estado final, restauração da iluminação e teleporte seguro ao lobby. `ReplicaSet` aparenta atualizar uma árvore de dados do jogador; `Gameplay.glassMakerChance` é especialmente útil para acompanhar a chance mostrada na interface. O valor `0` foi observado no encerramento e não deve ser interpretado como valor permanente.
 
-`Notify` disparou cinco vezes, mas a primeira versão do serializador truncou `messages` em `{...}`. A versão 2.5.1 aumenta a profundidade das tabelas para capturar texto, tipo e demais campos internos. `ReplicaWrite` informou três argumentos, mas não preservou seus slots nessa primeira coleta; a versão 2.5.1 agora numera cada argumento explicitamente, inclusive quando o valor é `nil`.
+`Notify` disparou cinco vezes, mas a primeira versão do serializador truncou `messages` em `{...}`. Desde a versão 2.5.1, tabelas internas e slots `nil` são preservados. A versão 2.5.2 também exibe corretamente booleanos `false` e compacta eventos idênticos recebidos em sequência.
 
-### Amostra remota — morte do portador do bebê
+### Amostras remotas — seleção e queda do bebê
 
 O bebê é concedido a um participante no lobby da partida, durante a seleção de cargos. Se o portador vencer levando o bebê, a recompensa final é multiplicada por `2x`.
 
@@ -674,16 +674,42 @@ Uma coleta feita quando o jogador local morreu registrou:
 | `22:29:57` | `Remotes.BabyAction` | `"cleanUp"` |
 | `22:30:00` | `Remotes.SetLighting` | `"MusicalChairsDark"` |
 
+Uma coleta posterior acompanhou o sorteio desde o lobby. A sequência observada foi:
+
+| Horário UTC | Remote | Argumentos relevantes |
+|---|---|---|
+| `22:33:25` | `Remotes.GamemodeAction` | `"StartBabyTransferAnimation"` |
+| `22:33:26` | `Remotes.Notify` | `"We have a newborn! an extra Player 367"` |
+| `22:33:38` | `Remotes.GamemodeAction` | `"EndBabyTransferAnimation"` |
+| `22:33:38` | `Remotes.Notify` | `"Win the games with the baby to double your earnings!"` |
+| `22:33:48` | `Remotes.Screenshot` | retrato usado na etapa da foto |
+| `22:33:57` | `Remotes.SetLighting` | `"RedLightGreenLight"` |
+| `22:33:57` | `Remotes.SafeTP` | destino da primeira fase |
+| `22:34:01` | `Remotes.GameStateUpdate` | `"StartGamemode"`, `"RedLightGreenLight"` |
+| `22:34:15` | `Remotes.BabyAction` | `"dropBaby"`, posição, identificador `"367"` |
+| `22:34:16` | `Remotes.BabyAction` | `"cleanUp"` |
+
+O número anunciado como `extra Player 367` reapareceu no primeiro `dropBaby`, mas uma queda posterior no mesmo `JobId` trouxe `"143"`. Portanto, o terceiro argumento não é um identificador permanente da rodada nem o `UserId` do portador. Ele pode identificar a representação/personagem extra criada para aquela queda, mas seu significado exato ainda precisa de mais amostras.
+
 `BabyAction` já permite implementar um rastreador passivo:
 
 - `dropBaby` abre o estado **bebê derrubado**, fornece a posição e um identificador da instância/entidade;
-- `cleanUp` encerra esse estado e deve remover qualquer marcador local;
+- `cleanUp` remove a representação caída; quando ocorre logo após o jogador pegar o bebê, funciona como confirmação de pickup;
 - o `CFrame` permite mostrar a última posição conhecida do bebê;
-- o identificador `"186"` não deve ser tratado como `UserId` sem outra amostra que demonstre essa relação.
+- o terceiro argumento é variável e não deve ser usado como identidade persistente.
+
+Uma ação controlada de soltar e pegar novamente confirmou:
+
+| Ação | ReplicaSet | BabyAction |
+|---|---|---|
+| Soltou | `SprintSpeed=21` | `dropBaby`, posição `(7971.75, 88.79, 3642.63)`, ID `"143"` |
+| Pegou novamente, 2 s depois | `SprintSpeed=16.6` | `cleanUp` |
+
+Nessa amostra, carregar o bebê reduziu `SprintSpeed` de `21` para `16.6`, uma diferença de `4.4`. O valor absoluto pode variar com bônus e estados da fase, então a implementação deve observar a mudança da velocidade, não exigir exatamente esses números.
 
 `SprintSpeed=0` ocorreu perto da morte, mas ainda pode representar imobilização, transição ou espectador. `MusicalChairsDark` identifica o estado de iluminação da fase, porém também não prova morte isoladamente. Para um detector confiável, combinar `Humanoid.Died`, atributo `Dead` e `BabyAction("dropBaby")` quando o jogador era o portador.
 
-Ainda falta capturar `BabyAction` no momento da entrega, coleta ou transferência do bebê. A próxima coleta deve começar antes do sorteio no lobby e continuar até o início da primeira fase. Logo depois de `dropBaby`, também é útil varrer **Mapa**, **Itens** e **Estrutura** com o filtro `baby` para localizar o objeto físico criado.
+Não apareceu um comando com nome explícito `pickupBaby`; a coleta controlada mostrou que o pickup é representado por `cleanUp` junto da redução de `SprintSpeed`. Como `cleanUp` também pode ser usado para despawn, o menu deve combinar os dois sinais. Para identificar visualmente o portador, ainda é necessário inspecionar o jogador escolhido imediatamente após `EndBabyTransferAnimation` e varrer **Mapa**, **Itens**, **Interface** e **Estrutura** com o filtro `baby`.
 
 ## Arquitetura sugerida para um menu específico
 

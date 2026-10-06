@@ -63,7 +63,8 @@ local function sortedKeys(values)
 end
 
 local function oneLine(value)
-    return tostring(value or ""):gsub("[\r\n\t]", " ")
+    if value == nil then value = "" end
+    return tostring(value):gsub("[\r\n\t]", " ")
 end
 
 local function formatValue(value)
@@ -614,6 +615,7 @@ function Inspector:Create(options)
     local lastRemoteReport = ""
     local remoteLog = {}
     local remoteEventCounts = {}
+    local remoteReceivedTotal = 0
     local remoteConnections = {}
     local monitoredRemotes = {}
     local remoteMonitoring = false
@@ -1419,7 +1421,8 @@ function Inspector:Create(options)
             "Escopo: " .. settings.RemoteScope,
             "Filtro do caminho: " .. (settings.RemoteFilter ~= "" and settings.RemoteFilter or "(nenhum)"),
             "Filtro dos argumentos: " .. (settings.RemotePayloadFilter ~= "" and settings.RemotePayloadFilter or "(nenhum)"),
-            string.format("Eventos preservados: %d | limite: %d", #remoteLog, settings.MaxRemoteLog),
+            string.format("Eventos recebidos: %d | registros preservados: %d | limite: %d",
+                remoteReceivedTotal, #remoteLog, settings.MaxRemoteLog),
             "Somente OnClientEvent; nenhum remote foi disparado pelo H Inspect.",
             "",
             "CONTAGEM POR CAMINHO",
@@ -1440,7 +1443,8 @@ function Inspector:Create(options)
         table.insert(lines, "EVENTOS")
         if #remoteLog == 0 then table.insert(lines, "Nenhum evento recebido até agora.") end
         for index, entry in ipairs(remoteLog) do
-            table.insert(lines, string.format("%03d. [%s] %s", index, entry.Time, entry.Path))
+            table.insert(lines, string.format("%03d. [%s] %s%s", index, entry.Time, entry.Path,
+                entry.Repeat > 1 and (" | repetido=" .. tostring(entry.Repeat) .. "x") or ""))
             table.insert(lines, "     args(" .. tostring(entry.ArgumentCount) .. "): " .. entry.Arguments)
         end
         return table.concat(lines, "\n")
@@ -1457,19 +1461,31 @@ function Inspector:Create(options)
         local path = fullName(remote)
         local argumentText = packed.n > 0 and table.concat(arguments, " | ") or "(nenhum)"
         if not matchesCommaFilter(path .. " " .. argumentText, settings.RemotePayloadFilter) then return end
+        remoteReceivedTotal = remoteReceivedTotal + 1
         remoteEventCounts[path] = (remoteEventCounts[path] or 0) + 1
-        table.insert(remoteLog, {
-            Time = utcTimestamp(),
-            Path = path,
-            ArgumentCount = packed.n,
-            Arguments = argumentText,
-        })
-        while #remoteLog > settings.MaxRemoteLog do table.remove(remoteLog, 1) end
         local now = os.clock()
+        local lastEntry = remoteLog[#remoteLog]
+        if lastEntry and lastEntry.Path == path and lastEntry.Arguments == argumentText
+            and now - lastEntry.Clock <= 0.25 then
+            lastEntry.Repeat = lastEntry.Repeat + 1
+            lastEntry.Time = utcTimestamp()
+            lastEntry.Clock = now
+        else
+            table.insert(remoteLog, {
+                Time = utcTimestamp(),
+                Clock = now,
+                Path = path,
+                ArgumentCount = packed.n,
+                Arguments = argumentText,
+                Repeat = 1,
+            })
+        end
+        while #remoteLog > settings.MaxRemoteLog do table.remove(remoteLog, 1) end
         if now - lastRemoteUiUpdate >= 0.25 then
             lastRemoteUiUpdate = now
             update("remote_status", "Monitor passivo ativo",
-                string.format("%d eventos preservados | último: %s", #remoteLog, path))
+                string.format("%d eventos | %d registros preservados | último: %s",
+                    remoteReceivedTotal, #remoteLog, path))
             update("remote_report", "Prévia dos eventos recebidos", preview(buildRemoteLogReport(), 3000))
         end
     end
@@ -1796,6 +1812,7 @@ function Inspector:Create(options)
         elseif name == "ClearRemoteLog" then
             remoteLog = {}
             remoteEventCounts = {}
+            remoteReceivedTotal = 0
             update("remote_status", remoteMonitoring and "Monitor passivo ativo" or "Histórico limpo",
                 "Nenhum evento preservado.")
             update("remote_report", "Prévia dos remotes", "Caminhos e eventos recebidos aparecerão aqui.")
@@ -1825,6 +1842,7 @@ function Inspector:Create(options)
             lastRemoteReport = ""
             remoteLog = {}
             remoteEventCounts = {}
+            remoteReceivedTotal = 0
             baseline = nil
             update("report_status", "Sessão limpa", "Nenhum relatório disponível.")
             update("report_preview", "Prévia", "O conteúdo mais recente aparecerá aqui.")
