@@ -108,6 +108,7 @@ Config.CategoryModules = {
     "categories/Interface.lua",
     "categories/World.lua",
     "categories/Explorer.lua",
+    "categories/Remotes.lua",
     "categories/Compare.lua",
     "categories/Reports.lua",
     "categories/Settings.lua",
@@ -1537,6 +1538,44 @@ return {
 end
 -- END categories/Players.lua
 
+-- BEGIN categories/Remotes.lua
+__modules["categories/Remotes.lua"] = function()
+return {
+    Id = "Remotes",
+    Label = "Remotes",
+    Icon = "overview",
+    Bookmarked = false,
+    RuntimeModule = "runtime/Inspector.lua",
+    Sections = {
+        {
+            Title = "Inventário de rede",
+            Icon = "search",
+            Controls = {
+                { Kind = "Dropdown", Setting = "RemoteScope", Id = "remote_scope", Label = "Escopo", Options = { "ReplicatedStorage", "Workspace", "Tudo replicado" }, Default = "ReplicatedStorage", UseList = true },
+                { Kind = "Input", Setting = "RemoteFilter", Id = "remote_filter", Label = "Filtro", Placeholder = "glass, rope, bounty, door...", Default = "" },
+                { Kind = "Slider", Setting = "MaxRemoteResults", Id = "max_remote_results", Label = "Máximo de remotes", Min = 20, Max = 300, Default = 150, Step = 10 },
+                { Kind = "Button", Setting = "ScanRemotes", Id = "scan_remotes", Label = "Varrer remotes", Description = "Lista RemoteEvent, UnreliableRemoteEvent e RemoteFunction sem chamar o servidor.", ButtonText = "Varrer" },
+                { Kind = "Button", Setting = "CopyRemoteReport", Id = "copy_remote_report", Label = "Copiar inventário", ButtonText = "Copiar" },
+            },
+        },
+        {
+            Title = "Eventos recebidos",
+            Icon = "info",
+            Controls = {
+                { Kind = "Slider", Setting = "MaxRemoteLog", Id = "max_remote_log", Label = "Máximo de eventos no histórico", Min = 20, Max = 300, Default = 120, Step = 10 },
+                { Kind = "Button", Setting = "StartRemoteMonitor", Id = "start_remote_monitor", Label = "Iniciar monitor passivo", Description = "Observa somente eventos enviados pelo servidor ao cliente que correspondem ao filtro.", ButtonText = "Iniciar" },
+                { Kind = "Button", Setting = "StopRemoteMonitor", Id = "stop_remote_monitor", Label = "Parar monitor", ButtonText = "Parar" },
+                { Kind = "Button", Setting = "CopyRemoteLog", Id = "copy_remote_log", Label = "Copiar eventos recebidos", ButtonText = "Copiar" },
+                { Kind = "Button", Setting = "ClearRemoteLog", Id = "clear_remote_log", Label = "Limpar histórico", ButtonText = "Limpar" },
+                { Kind = "Paragraph", Id = "remote_status", Label = "Monitor parado", Description = "Faça o inventário ou inicie a observação passiva.", Height = 72 },
+                { Kind = "Paragraph", Id = "remote_report", Label = "Prévia dos remotes", Description = "Caminhos e eventos recebidos aparecerão aqui.", Height = 280 },
+            },
+        },
+    },
+}
+end
+-- END categories/Remotes.lua
+
 -- BEGIN categories/Reports.lua
 __modules["categories/Reports.lua"] = function()
 return {
@@ -1551,7 +1590,7 @@ return {
             Icon = "sliders",
             Controls = {
                 { Kind = "Dropdown", Setting = "ReportDetail", Id = "report_detail", Label = "Nível de detalhe", Options = { "Resumido", "Detalhado" }, Default = "Detalhado", UseList = true },
-                { Kind = "Button", Setting = "ScanAll", Id = "scan_all_reports", Label = "Atualizar relatório completo", Description = "Inclui jogadores, itens, interface e mapa. A exploração livre e o diff são executados separadamente.", ButtonText = "Atualizar" },
+                { Kind = "Button", Setting = "ScanAll", Id = "scan_all_reports", Label = "Atualizar relatório completo", Description = "Inclui jogadores, itens, interface e mapa. Estrutura, remotes e diff são coletados separadamente.", ButtonText = "Atualizar" },
                 { Kind = "Button", Setting = "CopyReport", Id = "copy_report", Label = "Copiar relatório", Description = "Copia o texto completo quando o executor oferece área de transferência.", ButtonText = "Copiar" },
                 { Kind = "Button", Setting = "PrintReport", Id = "print_report", Label = "Enviar ao console", ButtonText = "Imprimir" },
                 { Kind = "Button", Setting = "ClearReport", Id = "clear_report", Label = "Limpar sessão", ButtonText = "Limpar" },
@@ -2190,6 +2229,39 @@ local function focusedToolDescendant(instance)
     return attributeCount > 0 or #readTags(instance) > 0
 end
 
+local function formatRemoteArgument(value, depth, seen)
+    local valueType = typeof(value)
+    if valueType == "nil" then return "nil" end
+    if valueType == "Instance" then
+        return string.format("<%s %s>", value.ClassName, fullName(value))
+    end
+    if valueType == "string" then
+        local text = oneLine(value)
+        if #text > 240 then text = string.sub(text, 1, 240) .. "..." end
+        return string.format("%q", text)
+    end
+    if valueType ~= "table" then return formatValue(value) end
+    if depth >= 2 then return "{...}" end
+    if seen[value] then return "{<ciclo>}" end
+    seen[value] = true
+
+    local entries = {}
+    for key, item in pairs(value) do
+        table.insert(entries, {
+            Key = formatRemoteArgument(key, depth + 1, seen),
+            Value = formatRemoteArgument(item, depth + 1, seen),
+        })
+        if #entries >= 12 then break end
+    end
+    table.sort(entries, function(a, b) return a.Key < b.Key end)
+    local parts = {}
+    for _, entry in ipairs(entries) do
+        table.insert(parts, "[" .. entry.Key .. "]=" .. entry.Value)
+    end
+    seen[value] = nil
+    return "{" .. table.concat(parts, ", ") .. "}"
+end
+
 function Inspector:Create(options)
     if type(_G.__HINSPECT_INSPECTOR_CLEANUP) == "function" then
         pcall(_G.__HINSPECT_INSPECTOR_CLEANUP)
@@ -2207,6 +2279,13 @@ function Inspector:Create(options)
     local lastGuiReport = ""
     local lastStructureReport = ""
     local lastSelectedPlayerReport = ""
+    local lastRemoteReport = ""
+    local remoteLog = {}
+    local remoteEventCounts = {}
+    local remoteConnections = {}
+    local monitoredRemotes = {}
+    local remoteMonitoring = false
+    local lastRemoteUiUpdate = 0
     local baseline
     local settings = {
         IncludePlayerAttributes = true,
@@ -2226,6 +2305,10 @@ function Inspector:Create(options)
         StructureScope = "Tudo relevante",
         StructureFilter = "",
         MaxStructureResults = 200,
+        RemoteScope = "ReplicatedStorage",
+        RemoteFilter = "",
+        MaxRemoteResults = 150,
+        MaxRemoteLog = 120,
         SnapshotScope = "Tudo relevante",
         SnapshotFilter = "",
         SnapshotLimit = 5000,
@@ -2908,6 +2991,191 @@ function Inspector:Create(options)
         return report, summary
     end
 
+    local function isRemoteObject(instance)
+        return instance:IsA("RemoteEvent") or instance:IsA("UnreliableRemoteEvent")
+            or instance:IsA("RemoteFunction")
+    end
+
+    local function remoteRoots()
+        if settings.RemoteScope == "ReplicatedStorage" then return { ReplicatedStorage } end
+        if settings.RemoteScope == "Workspace" then return { Workspace } end
+        local roots = { ReplicatedStorage, Workspace }
+        local localPlayer = Players.LocalPlayer
+        local playerGui = localPlayer and localPlayer:FindFirstChildOfClass("PlayerGui")
+        if playerGui then table.insert(roots, playerGui) end
+        return roots
+    end
+
+    local function remoteMatches(instance)
+        local path = fullName(instance)
+        local attributes = readAttributes(instance)
+        local tags = readTags(instance)
+        local searchable = path .. " " .. instance.ClassName .. " "
+            .. table.concat(attributes, " ") .. " " .. table.concat(tags, " ")
+        return matchesCommaFilter(searchable, settings.RemoteFilter)
+    end
+
+    local function scanRemotes(shouldPublish)
+        local matches = {}
+        local seen = {}
+        local scanned = 0
+        for _, root in ipairs(remoteRoots()) do
+            for _, instance in ipairs(root:GetDescendants()) do
+                scanned = scanned + 1
+                if isRemoteObject(instance) and not seen[instance] and remoteMatches(instance) then
+                    seen[instance] = true
+                    table.insert(matches, instance)
+                end
+                if scanned % 1500 == 0 then task.wait() end
+            end
+        end
+        table.sort(matches, function(a, b) return string.lower(fullName(a)) < string.lower(fullName(b)) end)
+
+        local maximum = math.min(settings.MaxRemoteResults, #matches)
+        local classCounts = {}
+        for _, instance in ipairs(matches) do
+            classCounts[instance.ClassName] = (classCounts[instance.ClassName] or 0) + 1
+        end
+        local lines = {
+            sessionHeader("REMOTES — " .. settings.RemoteScope),
+            "",
+            "Filtro: " .. (settings.RemoteFilter ~= "" and settings.RemoteFilter or "(nenhum)"),
+            string.format("Objetos lidos: %d | remotes: %d | exibindo: %d", scanned, #matches, maximum),
+            "Observação: esta coleta não chama FireServer nem InvokeServer.",
+            "",
+        }
+        for index = 1, maximum do
+            local instance = matches[index]
+            table.insert(lines, string.format("%03d. %s", index, fullName(instance)))
+            table.insert(lines, "     " .. specialInstanceDetails(instance, true))
+            table.insert(lines, "     pai: " .. containerSignalSummary(instance.Parent))
+        end
+        if maximum == 0 then table.insert(lines, "Nenhum remote corresponde ao filtro atual.") end
+        if maximum < #matches then
+            table.insert(lines, string.format("\n... %d remotes omitidos pelo limite.", #matches - maximum))
+        end
+
+        local countParts = {}
+        for className, count in pairs(classCounts) do
+            table.insert(countParts, className .. "=" .. tostring(count))
+        end
+        table.sort(countParts)
+        local summary = string.format("%d remotes em %s | %s", #matches, settings.RemoteScope,
+            #countParts > 0 and table.concat(countParts, ", ") or "nenhum")
+        local report = table.concat(lines, "\n")
+        lastRemoteReport = report
+        update("remote_status", "Inventário de remotes concluído", summary)
+        update("remote_report", "Prévia dos remotes", preview(report, 3000))
+        if shouldPublish ~= false then publishReport(report, summary) end
+        return report, summary
+    end
+
+    local function disconnectRemoteMonitor()
+        remoteMonitoring = false
+        for _, connection in ipairs(remoteConnections) do
+            pcall(function() connection:Disconnect() end)
+        end
+        remoteConnections = {}
+        monitoredRemotes = {}
+    end
+
+    local function buildRemoteLogReport()
+        local lines = {
+            sessionHeader("EVENTOS REMOTOS RECEBIDOS"),
+            "",
+            "Escopo: " .. settings.RemoteScope,
+            "Filtro: " .. (settings.RemoteFilter ~= "" and settings.RemoteFilter or "(nenhum)"),
+            string.format("Eventos preservados: %d | limite: %d", #remoteLog, settings.MaxRemoteLog),
+            "Somente OnClientEvent; nenhum remote foi disparado pelo H Inspect.",
+            "",
+            "CONTAGEM POR CAMINHO",
+        }
+        local counts = {}
+        for path, count in pairs(remoteEventCounts) do
+            table.insert(counts, { Path = path, Count = count })
+        end
+        table.sort(counts, function(a, b)
+            if a.Count == b.Count then return a.Path < b.Path end
+            return a.Count > b.Count
+        end)
+        if #counts == 0 then table.insert(lines, "  nenhum evento recebido") end
+        for _, item in ipairs(counts) do
+            table.insert(lines, string.format("  %d x %s", item.Count, item.Path))
+        end
+        table.insert(lines, "")
+        table.insert(lines, "EVENTOS")
+        if #remoteLog == 0 then table.insert(lines, "Nenhum evento recebido até agora.") end
+        for index, entry in ipairs(remoteLog) do
+            table.insert(lines, string.format("%03d. [%s] %s", index, entry.Time, entry.Path))
+            table.insert(lines, "     args(" .. tostring(entry.ArgumentCount) .. "): " .. entry.Arguments)
+        end
+        return table.concat(lines, "\n")
+    end
+
+    local function recordRemoteEvent(remote, ...)
+        if not remoteMonitoring then return end
+        local packed = table.pack(...)
+        local arguments = {}
+        for index = 1, packed.n do
+            table.insert(arguments, formatRemoteArgument(packed[index], 0, {}))
+        end
+        local path = fullName(remote)
+        remoteEventCounts[path] = (remoteEventCounts[path] or 0) + 1
+        table.insert(remoteLog, {
+            Time = utcTimestamp(),
+            Path = path,
+            ArgumentCount = packed.n,
+            Arguments = #arguments > 0 and table.concat(arguments, " | ") or "(nenhum)",
+        })
+        while #remoteLog > settings.MaxRemoteLog do table.remove(remoteLog, 1) end
+        local now = os.clock()
+        if now - lastRemoteUiUpdate >= 0.25 then
+            lastRemoteUiUpdate = now
+            update("remote_status", "Monitor passivo ativo",
+                string.format("%d eventos preservados | último: %s", #remoteLog, path))
+            update("remote_report", "Prévia dos eventos recebidos", preview(buildRemoteLogReport(), 3000))
+        end
+    end
+
+    local function monitorRemote(instance)
+        if monitoredRemotes[instance] or not remoteMatches(instance) then return end
+        if not (instance:IsA("RemoteEvent") or instance:IsA("UnreliableRemoteEvent")) then return end
+        local ok, connection = pcall(function()
+            return instance.OnClientEvent:Connect(function(...)
+                recordRemoteEvent(instance, ...)
+            end)
+        end)
+        if ok and connection then
+            monitoredRemotes[instance] = true
+            table.insert(remoteConnections, connection)
+        end
+    end
+
+    local function startRemoteMonitor()
+        disconnectRemoteMonitor()
+        remoteMonitoring = true
+        lastRemoteUiUpdate = 0
+        local monitoredCount = 0
+        for _, root in ipairs(remoteRoots()) do
+            for _, instance in ipairs(root:GetDescendants()) do monitorRemote(instance) end
+            local connection = root.DescendantAdded:Connect(function(instance)
+                if remoteMonitoring and isRemoteObject(instance) then monitorRemote(instance) end
+            end)
+            table.insert(remoteConnections, connection)
+        end
+        for _ in pairs(monitoredRemotes) do monitoredCount = monitoredCount + 1 end
+        update("remote_status", "Monitor passivo ativo",
+            string.format("Observando %d RemoteEvents | filtro: %s", monitoredCount,
+                settings.RemoteFilter ~= "" and settings.RemoteFilter or "nenhum"))
+        update("remote_report", "Prévia dos eventos recebidos", preview(buildRemoteLogReport(), 3000))
+    end
+
+    local function stopRemoteMonitor()
+        disconnectRemoteMonitor()
+        update("remote_status", "Monitor parado",
+            string.format("%d eventos permanecem no histórico para cópia.", #remoteLog))
+    end
+
     local function isSnapshotCandidate(instance, path, scope, filter)
         if filter ~= "" then return matchesFreeFilter(instance, path, filter) end
         if scope == "Interface" then return isGuiDatum(instance) end
@@ -3124,6 +3392,16 @@ function Inspector:Create(options)
             "Faça uma varredura do mapa antes de copiar.")
     end
 
+    local function copyRemoteReport()
+        copyText(lastRemoteReport, "remote_status",
+            "Faça um inventário de remotes antes de copiar.")
+    end
+
+    local function copyRemoteLog()
+        copyText(#remoteLog > 0 and buildRemoteLogReport() or "", "remote_status",
+            "Inicie o monitor e aguarde eventos enviados pelo servidor.")
+    end
+
     function runtime:GetOptions(source)
         if source == "PlayerTargets" then return playerTargetOptions() end
         return {}
@@ -3138,12 +3416,14 @@ function Inspector:Create(options)
             settings[name] = value == true
         elseif name == "ScanInterval" or name == "MaxWorldResults"
             or name == "MaxGuiResults" or name == "MaxStructureResults"
-            or name == "SnapshotLimit" then
+            or name == "SnapshotLimit" or name == "MaxRemoteResults"
+            or name == "MaxRemoteLog" then
             settings[name] = tonumber(value) or settings[name]
         elseif name == "WorldFocus" or name == "ReportDetail" or name == "StructureScope"
             or name == "SnapshotScope" or name == "WorldFilter" or name == "GuiFilter"
             or name == "StructureFilter" or name == "SnapshotFilter"
-            or name == "SelectedPlayer" then
+            or name == "SelectedPlayer" or name == "RemoteScope"
+            or name == "RemoteFilter" then
             settings[name] = tostring(value)
             if name == "SelectedPlayer" then
                 update("selected_player_status", "Alvo selecionado", settings.SelectedPlayer
@@ -3165,6 +3445,22 @@ function Inspector:Create(options)
             copyWorldReport()
         elseif name == "ScanStructure" then
             scanStructure(true)
+        elseif name == "ScanRemotes" then
+            scanRemotes(true)
+        elseif name == "CopyRemoteReport" then
+            copyRemoteReport()
+        elseif name == "StartRemoteMonitor" then
+            startRemoteMonitor()
+        elseif name == "StopRemoteMonitor" then
+            stopRemoteMonitor()
+        elseif name == "CopyRemoteLog" then
+            copyRemoteLog()
+        elseif name == "ClearRemoteLog" then
+            remoteLog = {}
+            remoteEventCounts = {}
+            update("remote_status", remoteMonitoring and "Monitor passivo ativo" or "Histórico limpo",
+                "Nenhum evento preservado.")
+            update("remote_report", "Prévia dos remotes", "Caminhos e eventos recebidos aparecerão aqui.")
         elseif name == "CaptureBaseline" then
             captureBaseline()
         elseif name == "CompareSnapshot" then
@@ -3188,6 +3484,9 @@ function Inspector:Create(options)
             lastReport, lastPlayersReport, lastWorldReport = "", "", ""
             lastItemsReport, lastGuiReport, lastStructureReport = "", "", ""
             lastSelectedPlayerReport = ""
+            lastRemoteReport = ""
+            remoteLog = {}
+            remoteEventCounts = {}
             baseline = nil
             update("report_status", "Sessão limpa", "Nenhum relatório disponível.")
             update("report_preview", "Prévia", "O conteúdo mais recente aparecerá aqui.")
@@ -3205,6 +3504,9 @@ function Inspector:Create(options)
             update("world_report", "Prévia do mapa", "A prévia será preenchida depois da primeira coleta.")
             update("structure_status", "Nenhuma busca", "Use palavras do jogo para localizar dados replicados.")
             update("structure_report", "Prévia da estrutura", "A prévia será preenchida depois da busca.")
+            update("remote_status", remoteMonitoring and "Monitor passivo ativo" or "Monitor parado",
+                "Faça o inventário ou inicie a observação passiva.")
+            update("remote_report", "Prévia dos remotes", "Caminhos e eventos recebidos aparecerão aqui.")
             update("compare_status", "Snapshot A não salvo", "Escolha o escopo e salve uma base primeiro.")
             update("compare_report", "Prévia das diferenças", "Mudanças relevantes aparecerão aqui.")
         end
@@ -3216,6 +3518,7 @@ function Inspector:Create(options)
         if destroyed then return end
         destroyed = true
         liveGeneration = liveGeneration + 1
+        disconnectRemoteMonitor()
         if _G.__HINSPECT_INSPECTOR_CLEANUP == cleanupFunction then
             _G.__HINSPECT_INSPECTOR_CLEANUP = nil
         end
@@ -3258,7 +3561,7 @@ end
 
 local Bundle = {
     Version = tostring(rawget(_G, "__HINSPECT_RELEASE_VERSION") or "unknown"),
-    ModuleCount = 14,
+    ModuleCount = 15,
 }
 
 local function createImporter()

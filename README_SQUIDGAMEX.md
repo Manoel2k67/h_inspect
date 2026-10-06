@@ -414,7 +414,7 @@ O contêiner principal é:
 Workspace.Map.Glass.Glasses
 ```
 
-Dentro dele existem dez pares, com dois lados em cada par. A notação da coleta foi:
+Dentro dele existem dez pares, com dois lados em cada par. Cada painel é um `BasePart` filho direto de `Glasses`, e o próprio `Name` contém `Pair`. A notação observada foi:
 
 ```text
 Pair1/1   Pair1/2
@@ -423,7 +423,7 @@ Pair2/1   Pair2/2
 Pair10/1  Pair10/2
 ```
 
-Aqui, `PairN/lado` representa o lado `1` ou `2` contido no par correspondente. O código deve enumerar os filhos dinamicamente, sem depender de uma quantidade fixa caso o jogo seja atualizado.
+Assim, o caminho lógico é `Workspace.Map.Glass.Glasses.<PairN/lado>`. O código funcional usa `Glasses:GetChildren()`, mantém apenas objetos `BasePart` cujo nome contém `Pair` e aplica a regra em cada peça diretamente. Não é necessário procurar um Model intermediário chamado `Pair1`. A enumeração deve continuar dinâmica para tolerar atualizações do jogo.
 
 ### Regra real/falso confirmada
 
@@ -473,10 +473,10 @@ O menu deve mostrar separadamente:
 ### Implementação recomendada
 
 1. Aguardar `Workspace.Map.Glass.Glasses` existir.
-2. Enumerar cada `Pair` e seus dois lados.
-3. Localizar a `BasePart` relevante de cada lado.
+2. Enumerar os filhos diretos com `Glasses:GetChildren()`.
+3. Manter somente `BasePart` cujo `Name` contém `Pair`.
 4. Classificar primeiro por `CanCollide` e validar com `Size.Z`.
-5. Atualizar quando filhos forem adicionados/removidos ou quando propriedades mudarem.
+5. Atualizar quando filhos forem adicionados/removidos ou quando `CanCollide` mudar.
 6. Não salvar coordenadas ou referências entre rodadas, pois o mapa pode ser recriado.
 
 O H Inspect 2.4.0 pode confirmar essa estrutura usando **Mapa → Vidros e ponte** e os filtros `Glasses, Pair`. O botão **Copiar relatório do mapa** preserva `CanCollide`, tamanho, caminho, pai/par e filhos diretos.
@@ -623,6 +623,24 @@ A varredura de mapa em foco `Tudo` retornou centenas de interações gerais, pri
 - A tag `Hidden` aparece nos painéis da ponte, mas **não diferencia painel real de falso**.
 - Nos painéis intactos observados, `CanCollide` diferencia os lados: `true` é real e `false` é falso; `Size.Z` ajuda a confirmar.
 - Um painel quebrado pode ser movido para `Y=-11000` e perder o `TouchInterest`, então deve ser marcado como removido em vez de reclassificado apenas pela colisão.
+
+## Coleta passiva de remotes
+
+O H Inspect 2.5.0 possui uma categoria **Remotes**. Ela separa duas tarefas:
+
+- **Varrer remotes:** cataloga `RemoteEvent`, `UnreliableRemoteEvent` e `RemoteFunction`, com caminho, classe, atributos, tags e contexto do pai.
+- **Monitor passivo:** registra somente `OnClientEvent`, ou seja, mensagens que o servidor já enviou ao cliente. Não chama `FireServer` ou `InvokeServer`.
+
+Fluxo recomendado para mapear uma mecânica:
+
+1. Escolher **ReplicatedStorage** e varrer com o filtro vazio para obter o inventário geral.
+2. Repetir com um filtro curto, por exemplo `glass, bridge`, `rope`, `bounty, reward`, `detective`, `door` ou `fork, dinner`.
+3. Configurar o filtro antes de iniciar o monitor passivo.
+4. Iniciar o monitor imediatamente antes da ação ou mudança de fase.
+5. Executar a ação normalmente, parar o monitor e copiar os eventos recebidos.
+6. Registrar junto o estado antes/depois, pois o nome do remote e seus argumentos precisam ser correlacionados com uma mudança observável.
+
+Limitação: esse monitor não mostra chamadas que um `LocalScript` faz do cliente para o servidor e não substitui `OnClientInvoke` de `RemoteFunction`, pois isso alteraria o comportamento do jogo. Mesmo sem esses hooks, o inventário e os eventos recebidos podem revelar anúncios de fase, alvos, recompensas, estado da ponte e atualizações de interface.
 
 ## Arquitetura sugerida para um menu específico
 

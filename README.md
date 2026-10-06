@@ -11,6 +11,7 @@ As operações do H Inspect são somente de leitura: ele não abre portas, não 
 - **Interface:** textos e imagens do `PlayerGui`, inclusive elementos invisíveis, com caminho, visibilidade, posição, tamanho, tags e atributos.
 - **Mapa:** portas, saídas, prompts, detectores, vidros, pontes, peças de material `Glass` e pistas visuais como `Highlight`, `SelectionBox`, decal, textura, `SurfaceAppearance`, `Beam` e GUI de mundo. A coleta agrupa objetos por assinatura e por pai/par, registra irmãos e filhos e pode ser copiada diretamente na aba.
 - **Estrutura:** busca livre em `ReplicatedStorage`, `Workspace`, `PlayerGui` ou personagem. Sem filtro, prioriza Values, Tools, remotes, módulos, prompts, tags e atributos.
+- **Remotes:** inventário de `RemoteEvent`, `UnreliableRemoteEvent` e `RemoteFunction`, além de monitor passivo de eventos recebidos por `OnClientEvent`. O inspetor não chama `FireServer` nem `InvokeServer`.
 - **Comparação:** snapshot A e estado atual, destacando objetos adicionados, removidos ou alterados.
 - **Sessão:** `PlaceId`, `GameId`, `JobId` e horário UTC.
 
@@ -57,9 +58,21 @@ Essa regra é específica da estrutura atualmente observada no Squid Game X e de
 4. **Interface**
 5. **Mapa**
 6. **Estrutura**
-7. **Comparar**
-8. **Relatórios**
-9. **Configurações**
+7. **Remotes**
+8. **Comparar**
+9. **Relatórios**
+10. **Configurações**
+
+## Como coletar remotes
+
+1. Abra **Remotes** e comece com o escopo **ReplicatedStorage**.
+2. Para inventariar tudo, deixe o filtro vazio. Para uma mecânica específica, use termos separados por vírgula, como `glass, rope, bounty, reward, detective, door, fork, dinner`.
+3. Clique em **Varrer remotes** e depois em **Copiar inventário**.
+4. Para observar uma fase, configure o filtro antes e clique em **Iniciar monitor passivo**.
+5. Execute normalmente a ação no jogo, como entrar na ponte, receber recompensa ou começar uma fase.
+6. Clique em **Parar monitor** e depois em **Copiar eventos recebidos**.
+
+O monitor registra caminho, horário e argumentos de mensagens `OnClientEvent` enviadas pelo servidor ao cliente. Ele lista `RemoteFunction`, mas não substitui `OnClientInvoke` e não intercepta chamadas feitas pelo cliente ao servidor. Filtros menores reduzem ruído e custo durante fases movimentadas.
 
 ## Arquitetura
 
@@ -103,7 +116,7 @@ As URLs atuais usam o repositório público `Manoel2k67/h_inspect`, branch `main
 git init
 git branch -M main
 git add .
-git commit -m "H Inspect 2.4.0 - mapa comparável"
+git commit -m "H Inspect 2.5.0 - monitor passivo de remotes"
 git remote add origin https://github.com/Manoel2k67/h_inspect.git
 git push -u origin main
 ```

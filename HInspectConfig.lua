@@ -100,6 +100,7 @@ Config.CategoryModules = {
     "categories/Interface.lua",
     "categories/World.lua",
     "categories/Explorer.lua",
+    "categories/Remotes.lua",
     "categories/Compare.lua",
     "categories/Reports.lua",
     "categories/Settings.lua",
