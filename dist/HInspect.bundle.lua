@@ -1683,7 +1683,8 @@ local Inspector = {}
 local ROLE_WORDS = {
     "role", "cargo", "class", "classe", "team", "time", "status",
     "job", "type", "tipo", "guard", "guarda", "detective", "detetive",
-    "leader", "lider", "líder", "maker", "fabricante", "vip", "playerstate", "state",
+    "leader", "lider", "líder", "maker", "fabricante", "baby", "newborn",
+    "vip", "playerstate", "state",
 }
 
 local INSPECTION_WORDS = {
@@ -1691,6 +1692,7 @@ local INSPECTION_WORDS = {
     "guard", "detective", "frontman", "leader", "maker", "glass", "vision",
     "rank", "dead", "winner", "safe", "protect", "target", "bounty", "reward",
     "cooldown", "knife", "fork", "weapon", "gun", "ammo", "damage", "hit",
+    "baby", "newborn", "sprint",
 }
 
 local TOOL_PART_WORDS = {
@@ -2200,6 +2202,11 @@ local function playerSpecialLabels(player)
     addAttribute("GlassMaker", "GlassMaker")
     addAttribute("GlassVision", "GlassVision")
     addAttribute("IsFrontman", "Frontman")
+    if player:GetAttribute("HasBaby") == true then
+        local babyType = player:GetAttribute("BabyType")
+        table.insert(labels, babyType ~= nil and babyType ~= ""
+            and ("Baby:" .. oneLine(babyType)) or "Baby")
+    end
     local guardRank = player:GetAttribute("GuardRank")
     if guardRank ~= nil and guardRank ~= "" then
         table.insert(labels, "Guard:" .. oneLine(guardRank))

@@ -17,7 +17,7 @@ As operações do H Inspect são somente de leitura: ele não abre portas, não 
 
 Os relatórios podem ser vistos no menu, enviados ao console ou copiados quando o executor oferece `setclipboard`/`toclipboard`.
 
-Na categoria **Jogadores**, a inspeção individual permite selecionar **Meu personagem** ou qualquer jogador do servidor. A lista destaca `GlassMaker`, `GlassVision`, Frontman e guardas quando esses sinais estão disponíveis. O relatório individual inclui atributos, Character, Humanoid, leaderstats, Backpack, Tools, acessórios e sinais anexados, e pode ser copiado separadamente sem gerar um snapshot completo.
+Na categoria **Jogadores**, a inspeção individual permite selecionar **Meu personagem** ou qualquer jogador do servidor. A lista destaca `GlassMaker`, `GlassVision`, Frontman, guardas e o portador do bebê (`HasBaby`/`BabyType`) quando esses sinais estão disponíveis. O relatório individual inclui atributos, Character, Humanoid, leaderstats, Backpack, Tools, acessórios e sinais anexados, e pode ser copiado separadamente sem gerar um snapshot completo.
 
 ## Fluxo para cargos, itens e fabricante de vidro
 
@@ -116,7 +116,7 @@ As URLs atuais usam o repositório público `Manoel2k67/h_inspect`, branch `main
 git init
 git branch -M main
 git add .
-git commit -m "H Inspect 2.5.2 - remotes compactados e booleanos"
+git commit -m "H Inspect 2.6.0 - detector do portador do bebê"
 git remote add origin https://github.com/Manoel2k67/h_inspect.git
 git push -u origin main
 ```

@@ -35,6 +35,7 @@ O jogo usa uma combinação de `Team`, atributos no objeto `Player`, ferramentas
 | Frontman/Officer | `IsFrontman=true` como sinal principal; `GlassVision` e estados `FRONTMAN_*` como sinais adicionais | Confirmado; time e atributos de guarda variam por fase |
 | Visão de vidro | `GlassVision=true` | Atributo confirmado; é separado de `GlassMaker` |
 | Glass Maker | `GlassMaker=true` em um único jogador e UI `Main.Chances.Glassmaker` | Identificação do sorteado confirmada; somente ele vê os vidros na final |
+| Portador do bebê | `HasBaby=true`, `BabyType` e acessório `BabyBack` | Confirmado |
 | Detetive | Interface `PlayerGui.DetectivePick.DetectivePick` e evidências em `Workspace.Data.Detective` | Mecânica confirmada; atributo do jogador desconhecido |
 
 ### Guardas encontrados
@@ -689,14 +690,14 @@ Uma coleta posterior acompanhou o sorteio desde o lobby. A sequência observada 
 | `22:34:15` | `Remotes.BabyAction` | `"dropBaby"`, posição, identificador `"367"` |
 | `22:34:16` | `Remotes.BabyAction` | `"cleanUp"` |
 
-O número anunciado como `extra Player 367` reapareceu no primeiro `dropBaby`, mas uma queda posterior no mesmo `JobId` trouxe `"143"`. Portanto, o terceiro argumento não é um identificador permanente da rodada nem o `UserId` do portador. Ele pode identificar a representação/personagem extra criada para aquela queda, mas seu significado exato ainda precisa de mais amostras.
+Uma inspeção posterior do portador resolveu o significado mais provável desse número. A notificação anunciou `extra Player 256`, e o jogador que carregava o bebê tinha `leaderstats.Id="256"`. Portanto, o terceiro argumento de `dropBaby` corresponde ao número de jogador (`leaderstats.Id`) do portador que soltou o bebê, não ao `UserId` e não a um ID persistente do bebê. Os valores `367`, `143` e `256` podem representar portadores diferentes.
 
 `BabyAction` já permite implementar um rastreador passivo:
 
 - `dropBaby` abre o estado **bebê derrubado**, fornece a posição e um identificador da instância/entidade;
 - `cleanUp` remove a representação caída; quando ocorre logo após o jogador pegar o bebê, funciona como confirmação de pickup;
 - o `CFrame` permite mostrar a última posição conhecida do bebê;
-- o terceiro argumento é variável e não deve ser usado como identidade persistente.
+- o terceiro argumento pode ser associado ao jogador procurando `leaderstats.Id` com o mesmo valor.
 
 Uma ação controlada de soltar e pegar novamente confirmou:
 
@@ -709,7 +710,41 @@ Nessa amostra, carregar o bebê reduziu `SprintSpeed` de `21` para `16.6`, uma d
 
 `SprintSpeed=0` ocorreu perto da morte, mas ainda pode representar imobilização, transição ou espectador. `MusicalChairsDark` identifica o estado de iluminação da fase, porém também não prova morte isoladamente. Para um detector confiável, combinar `Humanoid.Died`, atributo `Dead` e `BabyAction("dropBaby")` quando o jogador era o portador.
 
-Não apareceu um comando com nome explícito `pickupBaby`; a coleta controlada mostrou que o pickup é representado por `cleanUp` junto da redução de `SprintSpeed`. Como `cleanUp` também pode ser usado para despawn, o menu deve combinar os dois sinais. Para identificar visualmente o portador, ainda é necessário inspecionar o jogador escolhido imediatamente após `EndBabyTransferAnimation` e varrer **Mapa**, **Itens**, **Interface** e **Estrutura** com o filtro `baby`.
+Não apareceu um comando com nome explícito `pickupBaby`; a coleta controlada mostrou que o pickup é representado por `cleanUp` junto da redução de `SprintSpeed`. Como `cleanUp` também pode ser usado para despawn, o menu deve combinar os dois sinais.
+
+O portador pode ser identificado diretamente pelos dados replicados do `Player`:
+
+```text
+HasBaby = true
+BabyType = "FRONT"
+leaderstats.Id = "256"
+Character possui o acessório BabyBack
+```
+
+Ordem recomendada para o detector:
+
+1. `Player:GetAttribute("HasBaby") == true` como sinal principal;
+2. `BabyType` para mostrar a variante/posição, sem assumir ainda o significado completo de `FRONT`;
+3. acessório `BabyBack` como confirmação visual;
+4. `leaderstats.Id` para relacionar o portador ao terceiro argumento de `dropBaby`.
+
+Na amostra, o portador tinha `WalkSpeed=12`, `JumpHeight=6.2` e o `Push` equipado. Esses números podem sofrer penalidades ou bônus e não devem substituir `HasBaby` como detector.
+
+### Linha do tempo do lobby da partida
+
+A coleta desde o encerramento da seleção de times até a contagem da primeira fase revelou:
+
+1. `GameStateUpdate("TeamSelectionEnd")` e `CanSprint=false`.
+2. `GamemodeAction("PlayTutorial")` e progresso de `SkipCutscene("InitialTutorial", "(N/21)")`.
+3. `GamemodeAction("StartShowGlassMaker", ...)` e iluminação `Glass`.
+4. `Notify` informa textualmente o Glass Maker escolhido e explica vidro real/falso.
+5. `GamemodeAction("EndShowGlassMaker", true)` e iluminação `Lobby`.
+6. `GamemodeAction("ShowSymbols", true)` enquanto os minigames são escolhidos.
+7. `StartBabyTransferAnimation`, anúncio do novo portador e `ToggleDoors=true`.
+8. `EndBabyTransferAnimation`, `ToggleDoors=false`, `CanSprint=true` e tutorial da recompensa `2x`.
+9. Timers de `9` e `12` segundos, foto, escada e preparação para o próximo minigame.
+
+Há uma divergência importante: `StartShowGlassMaker` recebeu `"Manoel2k67"`, mas a notificação informou que o escolhido era `owertresmil1`. Portanto, o segundo argumento de `StartShowGlassMaker` não deve ser usado como identidade do Glass Maker. Para isso, preferir `GlassMaker=true`, o BillboardGui e o nome exibido em `Notify`.
 
 ## Arquitetura sugerida para um menu específico
 
@@ -721,7 +756,7 @@ Com base no que já foi confirmado, um futuro menu para o Squid Game X pode ser 
 4. **Portas** — registrar `DoorAccess`, forma exigida, prompts e caminho físico correspondente.
 5. **Ponte de vidro** — listar os pares, marcar lado real/falso por `CanCollide`, validar com `Size.Z` e acompanhar painéis quebrados.
 6. **Interações** — catálogo de elevadores, CCTV, incinerador, guarda-roupa e pickups.
-7. **Bebê** — portador atual quando identificável, multiplicador `2x`, última posição de `dropBaby` e limpeza por `cleanUp`.
+7. **Bebê** — portador por `HasBaby`, tipo, número de jogador, multiplicador `2x`, última posição de `dropBaby` e pickup/limpeza por `cleanUp`.
 8. **Diagnóstico** — exibir caminho completo, classe, atributos, tags e alterações em tempo real.
 
 Uma regra importante: cada módulo deve procurar instâncias e atributos por nome/caminho em tempo de execução. Não deve depender de um único jogador, `JobId` ou posição capturada neste relatório.
