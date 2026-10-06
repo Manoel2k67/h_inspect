@@ -178,6 +178,16 @@ Workspace.Data.Detective.Evidence.Instances.<UUID>.PPart.ProximityPrompt
 
 Cada prompt observado tinha ação `Collect`, distância `4` e estava `Enabled=false` para o jogador local. Isso confirma uma mecânica de coleta de evidências. O uso de UUIDs indica que o código futuro deve enumerar `Instances` dinamicamente, sem salvar os nomes encontrados no snapshot.
 
+## Mapas das fases
+
+Cada minigame fica em um modelo próprio dentro de `Workspace.Map`:
+
+| Fase | Caminho | Confiança |
+|---|---|---|
+| Red Light, Green Light | `Workspace.Map.RedLightGreenLight` | Confirmado |
+| Ponte de vidro | `Workspace.Map.Glass` | Confirmado |
+| Cadeiras Musicais | `Workspace.Map.MusicalChairs` | Confirmado |
+
 ## Red Light, Green Light
 
 A fase estava em:
@@ -202,10 +212,26 @@ Estados relevantes encontrados nos jogadores:
 | `FRONTMAN_RLGL` | Estado especial do Frontman nessa fase |
 | `FRONTMAN_RLGL_COOLDOWN` | Recarga da habilidade correspondente |
 | `PlayingGlass` | Participando da fase da ponte de vidro |
+| `GlassVision` | Tem visão especial dos vidros |
+| `FRONTMAN_GLASS_PAIR_SELECTION` | Índice do par selecionado pelo Frontman na ponte |
 
 Os nomes dos atributos são confirmados. A descrição funcional é uma interpretação e deve ser validada observando quando cada valor muda.
 
 ## Itens, mão e hotbar
+
+### Resumo rápido dos itens
+
+| Item | Quem usa | Onde aparece | Dados |
+|---|---|---|---|
+| `Push` | Jogador comum | `Backpack` ou `Character` | - |
+| `MPS-5` | Guardas | `Character` dos guardas | `AmmoCapacity=30`, `HitDamage=10`, `Automatic` |
+| `Revolver` | Frontman/Officer | `Backpack` ou `Character` | `AmmoCapacity=6`, `HitDamage=40` |
+| `Fork` | Fase do jantar | `Backpack` ou `Character` | - |
+
+Regra de item equipado versus guardado:
+
+- `Players.<nome>.Backpack.<Tool>` → guardado na mochila.
+- `Workspace.<nome>.<Tool>` → equipado na mão.
 
 O relatório distingue item guardado de item equipado pelo pai da ferramenta:
 
@@ -307,10 +333,28 @@ Não é recomendado salvar coordenadas fixas enquanto houver um caminho de inst�
 | Pegar sniper | `Workspace.Map.RedLightGreenLight.SniperRoom.Bags.Bag.ProximityPrompt` com ação `Pickup Sniper` |
 | Trocar roupa de guarda | `Workspace.Data.WardrobeTriggers.OpenGuardWardrobe.ProximityPrompt` |
 | Carregar jogador | `Workspace.<jogador>.HumanoidRootPart.CarryPrompt` com ação `Carry` |
+| Abrir armaria | `Workspace.Data.GuardQuarters.Armoury`, prompt com ação `Open Armoury` |
 
 No guarda-roupa, a ação observada foi `Switch Guard Skin`, com tags `DetectiveDisabled` e `GuardSkinSwitchPrompt`. A tag `DetectiveDisabled` pode ajudar a entender restrições do detetive, mas seu efeito ainda não foi testado.
 
 O `CarryPrompt` observado estava `Enabled=false`, com distância `5`, tempo de pressão `0.2` e tag `CarryPrompt`. Como só há uma inspeção individual desse sinal, ele não deve ser associado exclusivamente ao Glass Maker; provavelmente é uma interação geral de personagens.
+
+## Área dos guardas
+
+Os dados dos alojamentos ficam em:
+
+```text
+Workspace.Data.GuardQuarters
+```
+
+| Elemento | Caminho/sinal | Confiança |
+|---|---|---|
+| Quartos | `Room1` até `Room10` dentro de `GuardQuarters` | Confirmado |
+| Armaria | `Workspace.Data.GuardQuarters.Armoury` | Confirmado |
+| Prompt da armaria | ação `Open Armoury`, com a tag `DetectiveDisabled` | Confirmado |
+
+- Os quartos correspondem ao atributo `LockerRoom` do guarda (`Room1`..`Room10`): é o quarto onde o guarda nasce.
+- A tag `DetectiveDisabled` também aparece no guarda-roupa (`Switch Guard Skin`). Isso sugere que o Detetive não pode usar essas interações, mas o efeito ainda não foi testado.
 
 ## Descobertas das buscas em Estrutura
 
@@ -549,6 +593,14 @@ recompensa
 O melhor teste é salvar um snapshot antes da mensagem e comparar logo depois que o Líder selecionar o alvo. Também vale executar **Jogadores** imediatamente após a marcação para procurar um atributo novo no Líder e na vítima.
 
 A varredura de mapa em foco `Tudo` retornou centenas de interações gerais, principalmente elevadores e CCTV, sem identificar a arena do jantar. Para essa fase, buscas estruturais específicas e comparação antes/depois serão mais úteis que a varredura genérica do mapa.
+
+## Observações importantes
+
+- `PlayingRLGL` pode continuar `true` mesmo depois da fase. Para detectar a ponte, prefira `PlayingGlass`.
+- `GlassMaker` é definido no lobby e permanece no jogador.
+- `GlassVision` e `GlassMaker` são atributos distintos.
+- O filtro genérico `glass` no H Inspect traz muitos falsos positivos (óculos de avatar, cones etc.). Os filtros `Glasses` ou `Pair` são mais limpos.
+- A tag `Hidden` aparece nos painéis da ponte, mas **não diferencia painel real de falso**.
 
 ## Arquitetura sugerida para um menu específico
 
