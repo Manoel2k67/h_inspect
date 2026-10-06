@@ -11,6 +11,18 @@ local ROLE_WORDS = {
     "leader", "lider", "líder", "maker", "fabricante", "vip", "playerstate", "state",
 }
 
+local INSPECTION_WORDS = {
+    "role", "cargo", "class", "team", "status", "state", "playing", "inside",
+    "guard", "detective", "frontman", "leader", "maker", "glass", "vision",
+    "rank", "dead", "winner", "safe", "protect", "target", "bounty", "reward",
+    "cooldown", "knife", "fork", "weapon", "gun", "ammo", "damage", "hit",
+}
+
+local TOOL_PART_WORDS = {
+    "handle", "blade", "knife", "fork", "hit", "hitbox", "main", "weapon",
+    "tip", "edge", "grip", "trigger", "mag", "ammo",
+}
+
 local DOOR_WORDS = {
     "door", "porta", "gate", "exit", "escape", "saida", "saída",
     "circle", "triangle", "square", "shape", "symbol", "lever", "alavanca",
@@ -337,6 +349,48 @@ local function belongsToTool(instance)
     return ok and ancestor ~= nil
 end
 
+local function playerSpecialLabels(player)
+    local labels = {}
+    local function addAttribute(attributeName, label)
+        local ok, value = pcall(function() return player:GetAttribute(attributeName) end)
+        if ok and value ~= nil and value ~= false and value ~= "" then
+            table.insert(labels, label or attributeName)
+        end
+    end
+    addAttribute("GlassMaker", "GlassMaker")
+    addAttribute("GlassVision", "GlassVision")
+    addAttribute("IsFrontman", "Frontman")
+    local guardRank = player:GetAttribute("GuardRank")
+    if guardRank ~= nil and guardRank ~= "" then
+        table.insert(labels, "Guard:" .. oneLine(guardRank))
+    elseif player:GetAttribute("IsGuard") == true then
+        table.insert(labels, "Guard")
+    end
+    return labels
+end
+
+local function playerOptionLabel(player)
+    local special = playerSpecialLabels(player)
+    if #special > 0 then
+        return "[" .. table.concat(special, ",") .. "] @" .. player.Name
+    end
+    return "@" .. player.Name
+end
+
+local function focusedToolDescendant(instance)
+    if instance:IsA("Script") or instance:IsA("LocalScript") or instance:IsA("ModuleScript")
+        or instance:IsA("ValueBase") or instance:IsA("Sound") or instance:IsA("Animation")
+        or instance:IsA("RemoteEvent") or instance:IsA("RemoteFunction")
+        or instance:IsA("UnreliableRemoteEvent") or instance:IsA("ProximityPrompt")
+        or instance:IsA("ClickDetector") or instance:IsA("Attachment")
+        or instance:IsA("Constraint") then
+        return true
+    end
+    if instance:IsA("BasePart") and containsAny(instance.Name, TOOL_PART_WORDS) then return true end
+    local _, attributeCount = readAttributes(instance)
+    return attributeCount > 0 or #readTags(instance) > 0
+end
+
 function Inspector:Create(options)
     if type(_G.__HINSPECT_INSPECTOR_CLEANUP) == "function" then
         pcall(_G.__HINSPECT_INSPECTOR_CLEANUP)
@@ -353,6 +407,7 @@ function Inspector:Create(options)
     local lastItemsReport = ""
     local lastGuiReport = ""
     local lastStructureReport = ""
+    local lastSelectedPlayerReport = ""
     local baseline
     local settings = {
         IncludePlayerAttributes = true,
@@ -361,6 +416,8 @@ function Inspector:Create(options)
         IncludeAccessories = true,
         LivePlayerScan = false,
         ScanInterval = 5,
+        SelectedPlayer = "Meu personagem",
+        InspectToolDescendants = true,
         WorldFocus = "Tudo",
         WorldFilter = "",
         MaxWorldResults = 80,
@@ -387,6 +444,225 @@ function Inspector:Create(options)
         update("report_status", "Relatório pronto", summary)
         update("report_preview", "Prévia do relatório", preview(report, 2500))
         update("home_status", "Última coleta concluída", summary)
+    end
+
+    local function playerTargetOptions()
+        local optionsList = { "Meu personagem" }
+        local players = Players:GetPlayers()
+        table.sort(players, function(a, b) return string.lower(a.Name) < string.lower(b.Name) end)
+        for _, player in ipairs(players) do
+            if player ~= Players.LocalPlayer then
+                table.insert(optionsList, playerOptionLabel(player))
+            end
+        end
+        return optionsList
+    end
+
+    local function resolveSelectedPlayer()
+        if settings.SelectedPlayer == "Meu personagem" then return Players.LocalPlayer end
+        local username = string.match(tostring(settings.SelectedPlayer or ""), "@([%w_]+)")
+        if not username then return nil end
+        for _, player in ipairs(Players:GetPlayers()) do
+            if string.lower(player.Name) == string.lower(username) then return player end
+        end
+        return nil
+    end
+
+    local function appendAttributeSection(lines, title, instance)
+        local attributes = instance and readAttributes(instance) or {}
+        table.insert(lines, title .. " (" .. tostring(#attributes) .. ")")
+        if #attributes == 0 then
+            table.insert(lines, "  nenhum")
+        else
+            for _, attribute in ipairs(attributes) do table.insert(lines, "  - " .. attribute) end
+        end
+        table.insert(lines, "")
+        return attributes
+    end
+
+    local function inspectSelectedPlayer()
+        local player = resolveSelectedPlayer()
+        if not player then
+            lastSelectedPlayerReport = ""
+            update("selected_player_status", "Jogador indisponível",
+                "O alvo saiu do servidor. Abra o seletor e escolha outro jogador.")
+            update("selected_player_report", "Prévia individual", "Nenhum dado coletado.")
+            return
+        end
+
+        update("selected_player_status", "Inspecionando " .. player.Name,
+            "Lendo Player, Character, Backpack, atributos e ferramentas.")
+        local character = player.Character
+        local backpack = player:FindFirstChildOfClass("Backpack")
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        local teamName = player.Team and player.Team.Name or (player.Neutral and "Neutral" or "sem time")
+        local lines = {
+            sessionHeader("INSPEÇÃO INDIVIDUAL"),
+            "",
+            string.format("Alvo: %s | display=%q | userId=%s", player.Name,
+                oneLine(player.DisplayName), tostring(player.UserId)),
+            string.format("LocalPlayer: %s | team=%q | neutral=%s", tostring(player == Players.LocalPlayer),
+                teamName, tostring(player.Neutral)),
+            "Player: " .. fullName(player),
+            "Character: " .. (character and fullName(character) or "ausente"),
+            "Backpack: " .. (backpack and fullName(backpack) or "ausente"),
+            "",
+        }
+
+        local playerAttributes = readAttributes(player)
+        local characterAttributes = character and readAttributes(character) or {}
+        local highlights = {}
+        for _, attribute in ipairs(playerAttributes) do
+            if containsAny(attribute, INSPECTION_WORDS) then table.insert(highlights, "Player." .. attribute) end
+        end
+        for _, attribute in ipairs(characterAttributes) do
+            if containsAny(attribute, INSPECTION_WORDS) then table.insert(highlights, "Character." .. attribute) end
+        end
+        local specialLabels = playerSpecialLabels(player)
+        if #specialLabels > 0 then table.insert(highlights, 1, "Detector=" .. table.concat(specialLabels, ", ")) end
+        table.insert(lines, "DESTAQUES")
+        if #highlights == 0 then
+            table.insert(lines, "  nenhum sinal especial encontrado")
+        else
+            for _, highlight in ipairs(highlights) do table.insert(lines, "  - " .. highlight) end
+        end
+        table.insert(lines, "")
+
+        table.insert(lines, "PERSONAGEM")
+        if humanoid then
+            local stateOk, humanoidState = pcall(function() return humanoid:GetState() end)
+            table.insert(lines, string.format(
+                "  Humanoid: health=%s/%s | walkSpeed=%s | jumpPower=%s | jumpHeight=%s | hipHeight=%s | rig=%s | state=%s",
+                tostring(humanoid.Health), tostring(humanoid.MaxHealth), tostring(humanoid.WalkSpeed),
+                tostring(humanoid.JumpPower), tostring(humanoid.JumpHeight), tostring(humanoid.HipHeight),
+                tostring(humanoid.RigType), stateOk and tostring(humanoidState) or "indisponível"))
+        else
+            table.insert(lines, "  Humanoid: ausente")
+        end
+        if rootPart and rootPart:IsA("BasePart") then
+            table.insert(lines, "  posição=" .. formatValue(rootPart.Position)
+                .. " | velocidade=" .. formatValue(rootPart.AssemblyLinearVelocity))
+        else
+            table.insert(lines, "  HumanoidRootPart: ausente")
+        end
+        table.insert(lines, "")
+
+        appendAttributeSection(lines, "ATRIBUTOS — PLAYER", player)
+        if character then appendAttributeSection(lines, "ATRIBUTOS — CHARACTER", character) end
+
+        local values = {}
+        local roots = { player }
+        if character then table.insert(roots, character) end
+        if backpack then table.insert(roots, backpack) end
+        local playerGui = player:FindFirstChildOfClass("PlayerGui")
+        local seenValues = {}
+        for _, root in ipairs(roots) do
+            if root then
+                for _, object in ipairs(root:GetDescendants()) do
+                    if object:IsA("ValueBase") and not seenValues[object] and not belongsToTool(object)
+                        and not (playerGui and object:IsDescendantOf(playerGui)) then
+                        local parentIsLeaderstats = object.Parent and string.lower(object.Parent.Name) == "leaderstats"
+                        if parentIsLeaderstats or containsAny(fullName(object), INSPECTION_WORDS) then
+                            seenValues[object] = true
+                            local valueOk, value = pcall(function() return object.Value end)
+                            if valueOk then table.insert(values, fullName(object) .. "=" .. formatValue(value)) end
+                        end
+                    end
+                end
+            end
+        end
+        table.sort(values)
+        table.insert(lines, "VALORES E LEADERSTATS (" .. tostring(#values) .. ")")
+        if #values == 0 then table.insert(lines, "  nenhum") end
+        for _, value in ipairs(values) do table.insert(lines, "  - " .. value) end
+        table.insert(lines, "")
+
+        local tools = {}
+        local containers = {
+            { Name = "equipado", Instance = character },
+            { Name = "mochila", Instance = backpack },
+        }
+        for _, container in ipairs(containers) do
+            if container.Instance then
+                for _, object in ipairs(container.Instance:GetChildren()) do
+                    if object:IsA("Tool") then
+                        table.insert(tools, { Tool = object, Location = container.Name })
+                    end
+                end
+            end
+        end
+        table.sort(tools, function(a, b)
+            if a.Tool.Name == b.Tool.Name then return a.Location < b.Location end
+            return string.lower(a.Tool.Name) < string.lower(b.Tool.Name)
+        end)
+        table.insert(lines, "FERRAMENTAS (" .. tostring(#tools) .. ")")
+        if #tools == 0 then table.insert(lines, "  nenhuma") end
+        for _, entry in ipairs(tools) do
+            local tool = entry.Tool
+            table.insert(lines, string.format("  [%s] local=%s | %s", tool.Name, entry.Location, fullName(tool)))
+            table.insert(lines, "    " .. specialInstanceDetails(tool, true))
+            if settings.InspectToolDescendants then
+                local focused = {}
+                for _, object in ipairs(tool:GetDescendants()) do
+                    if focusedToolDescendant(object) then table.insert(focused, object) end
+                end
+                table.sort(focused, function(a, b) return string.lower(fullName(a)) < string.lower(fullName(b)) end)
+                local maximum = math.min(#focused, 80)
+                for index = 1, maximum do
+                    local object = focused[index]
+                    table.insert(lines, "    - " .. fullName(object) .. " | "
+                        .. specialInstanceDetails(object, true))
+                end
+                if maximum < #focused then
+                    table.insert(lines, string.format("    ... %d descendentes úteis omitidos", #focused - maximum))
+                end
+            end
+        end
+        table.insert(lines, "")
+
+        local accessories = {}
+        if character then
+            for _, object in ipairs(character:GetChildren()) do
+                if object:IsA("Accessory") then table.insert(accessories, object.Name) end
+            end
+        end
+        table.sort(accessories, function(a, b) return string.lower(a) < string.lower(b) end)
+        table.insert(lines, "ACESSÓRIOS (" .. tostring(#accessories) .. ")")
+        table.insert(lines, "  " .. joinOrNone(accessories))
+        table.insert(lines, "")
+
+        local characterSignals = {}
+        if character then
+            for _, object in ipairs(character:GetDescendants()) do
+                if not belongsToTool(object) and not object:IsA("Accessory")
+                    and (object:IsA("ProximityPrompt") or object:IsA("ClickDetector")
+                        or object:IsA("Highlight") or object:IsA("SelectionBox")
+                        or object:IsA("BillboardGui")) then
+                    table.insert(characterSignals, object)
+                end
+            end
+        end
+        table.sort(characterSignals, function(a, b) return string.lower(fullName(a)) < string.lower(fullName(b)) end)
+        table.insert(lines, "SINAIS ANEXADOS AO CHARACTER (" .. tostring(#characterSignals) .. ")")
+        if #characterSignals == 0 then table.insert(lines, "  nenhum") end
+        local signalMaximum = math.min(#characterSignals, 60)
+        for index = 1, signalMaximum do
+            local object = characterSignals[index]
+            table.insert(lines, "  - " .. fullName(object) .. " | " .. specialInstanceDetails(object, true))
+        end
+        if signalMaximum < #characterSignals then
+            table.insert(lines, string.format("  ... %d sinais omitidos", #characterSignals - signalMaximum))
+        end
+
+        local report = table.concat(lines, "\n")
+        local summary = string.format("%s | %d atributos | %d valores | %d Tools | %d sinais anexados",
+            player.Name, #playerAttributes + #characterAttributes, #values, #tools, #characterSignals)
+        lastSelectedPlayerReport = report
+        update("selected_player_status", "Inspeção concluída: " .. player.Name,
+            summary .. " | abra o seletor novamente para atualizar a lista")
+        update("selected_player_report", "Prévia de " .. player.Name, preview(report, 5200))
+        publishReport(report, summary)
     end
 
     local function scanPlayers(shouldPublish)
@@ -919,30 +1195,49 @@ function Inspector:Create(options)
         end)
     end
 
-    local function copyLastReport()
-        if lastReport == "" then
-            update("report_status", "Nada para copiar", "Crie uma varredura antes de exportar.")
-            return
+    local function copyText(report, statusId, emptyMessage)
+        if report == "" then
+            update(statusId, "Nada para copiar", emptyMessage)
+            return false
         end
         local clipboard = type(setclipboard) == "function" and setclipboard
             or (type(toclipboard) == "function" and toclipboard or nil)
         if not clipboard then
-            update("report_status", "Área de transferência indisponível", "Use Enviar ao console e copie a saída manualmente.")
-            return
+            update(statusId, "Área de transferência indisponível",
+                "Este executor não oferece setclipboard/toclipboard.")
+            return false
         end
-        local ok, err = pcall(clipboard, lastReport)
+        local ok, err = pcall(clipboard, report)
         if ok then
-            update("report_status", "Relatório copiado", string.format("%d caracteres enviados para a área de transferência.", #lastReport))
+            update(statusId, "Relatório copiado",
+                string.format("%d caracteres enviados para a área de transferência.", #report))
+            return true
         else
-            update("report_status", "Falha ao copiar", tostring(err))
+            update(statusId, "Falha ao copiar", tostring(err))
+            return false
         end
+    end
+
+    local function copyLastReport()
+        copyText(lastReport, "report_status", "Crie uma varredura antes de exportar.")
+    end
+
+    local function copySelectedPlayerReport()
+        copyText(lastSelectedPlayerReport, "selected_player_status",
+            "Inspecione o jogador selecionado antes de copiar.")
+    end
+
+    function runtime:GetOptions(source)
+        if source == "PlayerTargets" then return playerTargetOptions() end
+        return {}
     end
 
     function runtime:Set(name, value)
         if destroyed then return end
         if name == "IncludePlayerAttributes" or name == "IncludePlayerTools"
             or name == "IncludeToolDescendants" or name == "IncludeAccessories"
-            or name == "IncludeHiddenGui" or name == "LivePlayerScan" then
+            or name == "IncludeHiddenGui" or name == "LivePlayerScan"
+            or name == "InspectToolDescendants" then
             settings[name] = value == true
         elseif name == "ScanInterval" or name == "MaxWorldResults"
             or name == "MaxGuiResults" or name == "MaxStructureResults"
@@ -950,10 +1245,19 @@ function Inspector:Create(options)
             settings[name] = tonumber(value) or settings[name]
         elseif name == "WorldFocus" or name == "ReportDetail" or name == "StructureScope"
             or name == "SnapshotScope" or name == "WorldFilter" or name == "GuiFilter"
-            or name == "StructureFilter" or name == "SnapshotFilter" then
+            or name == "StructureFilter" or name == "SnapshotFilter"
+            or name == "SelectedPlayer" then
             settings[name] = tostring(value)
+            if name == "SelectedPlayer" then
+                update("selected_player_status", "Alvo selecionado", settings.SelectedPlayer
+                    .. " | clique em Inspecionar para gerar o relatório focado.")
+            end
         elseif name == "ScanPlayers" then
             scanPlayers(true)
+        elseif name == "InspectSelectedPlayer" then
+            inspectSelectedPlayer()
+        elseif name == "CopySelectedPlayer" then
+            copySelectedPlayerReport()
         elseif name == "ScanItems" then
             scanItems(true)
         elseif name == "ScanGui" then
@@ -984,12 +1288,16 @@ function Inspector:Create(options)
         elseif name == "ClearReport" then
             lastReport, lastPlayersReport, lastWorldReport = "", "", ""
             lastItemsReport, lastGuiReport, lastStructureReport = "", "", ""
+            lastSelectedPlayerReport = ""
             baseline = nil
             update("report_status", "Sessão limpa", "Nenhum relatório disponível.")
             update("report_preview", "Prévia", "O conteúdo mais recente aparecerá aqui.")
             update("home_status", "Aguardando coleta", "Use o snapshot completo ou uma varredura direcionada.")
             update("players_status", "Nenhuma varredura", "Os possíveis sinais de cargo aparecerão aqui.")
             update("players_report", "Prévia dos jogadores", "A prévia será preenchida depois da primeira coleta.")
+            update("selected_player_status", "Nenhum jogador inspecionado",
+                "Escolha Meu personagem ou outro jogador e clique em Inspecionar.")
+            update("selected_player_report", "Prévia individual", "O relatório focado aparecerá aqui.")
             update("items_status", "Nenhuma varredura", "Itens equipados e guardados aparecerão aqui.")
             update("items_report", "Prévia dos itens", "A prévia será preenchida depois da primeira coleta.")
             update("gui_status", "Nenhuma varredura", "Textos como cargos, chances e avisos de fase aparecerão aqui.")
