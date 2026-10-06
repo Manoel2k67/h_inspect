@@ -46,7 +46,7 @@ Foram observados vários exemplos úteis:
 - Officer/Frontman: `Team="Guard"`, `IsGuard=true`, `GuardRank="Officer"`, `IsFrontman=true`, `ChatTag="FRONTMAN"` e item `Revolver`.
 - A arma exposta no personagem possui `WeaponType="BulletWeapon"`.
 
-Na segunda amostra, guardas Círculo apareceram nos quartos `Room1`, `Room4` e `Room7`; na primeira, outro estava em `Room2`. Portanto, `LockerRoom` parece ser uma alocação de quarto, não um identificador confiável de patente.
+Na segunda amostra, guardas Círculo apareceram nos quartos `Room1`, `Room4` e `Room7`; na primeira, outro estava em `Room2`. Portanto, `LockerRoom` parece ser uma alocação de quarto, não um identificador confiável de patente. (editado pelo Manoel criador das analises> Isso mesmo o room é um quarto onde o guarda spawna.)
 
 Também existem dados de progressão de cargo na interface local:
 
