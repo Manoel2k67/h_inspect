@@ -99,7 +99,7 @@ As URLs atuais usam o repositório público `Manoel2k67/h_inspect`, branch `main
 git init
 git branch -M main
 git add .
-git commit -m "H Inspect 2.3.0 - inspeção individual"
+git commit -m "H Inspect 2.3.1 - inspeção individual"
 git remote add origin https://github.com/Manoel2k67/h_inspect.git
 git push -u origin main
 ```

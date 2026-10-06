@@ -23,6 +23,16 @@ local TOOL_PART_WORDS = {
     "tip", "edge", "grip", "trigger", "mag", "ammo",
 }
 
+local IGNORED_INSPECTION_ATTRIBUTES = {
+    activepayerstatus = true,
+    dailyrewardsstreak = true,
+    isgameready = true,
+    platformspenderstatus = true,
+    playerready = true,
+    teamapplied = true,
+    teamselected = true,
+}
+
 local DOOR_WORDS = {
     "door", "porta", "gate", "exit", "escape", "saida", "saída",
     "circle", "triangle", "square", "shape", "symbol", "lever", "alavanca",
@@ -80,6 +90,12 @@ end
 
 local function normalizedFilter(value)
     return string.lower(tostring(value or "")):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function isInspectionAttribute(attribute)
+    local key = string.lower(string.match(tostring(attribute or ""), "^([^=]+)=") or tostring(attribute or ""))
+    if IGNORED_INSPECTION_ATTRIBUTES[key] then return false end
+    return containsAny(key, INSPECTION_WORDS)
 end
 
 local function readTags(instance)
@@ -514,10 +530,10 @@ function Inspector:Create(options)
         local characterAttributes = character and readAttributes(character) or {}
         local highlights = {}
         for _, attribute in ipairs(playerAttributes) do
-            if containsAny(attribute, INSPECTION_WORDS) then table.insert(highlights, "Player." .. attribute) end
+            if isInspectionAttribute(attribute) then table.insert(highlights, "Player." .. attribute) end
         end
         for _, attribute in ipairs(characterAttributes) do
-            if containsAny(attribute, INSPECTION_WORDS) then table.insert(highlights, "Character." .. attribute) end
+            if isInspectionAttribute(attribute) then table.insert(highlights, "Character." .. attribute) end
         end
         local specialLabels = playerSpecialLabels(player)
         if #specialLabels > 0 then table.insert(highlights, 1, "Detector=" .. table.concat(specialLabels, ", ")) end
@@ -556,14 +572,15 @@ function Inspector:Create(options)
         if character then table.insert(roots, character) end
         if backpack then table.insert(roots, backpack) end
         local playerGui = player:FindFirstChildOfClass("PlayerGui")
+        local leaderstats = player:FindFirstChild("leaderstats")
         local seenValues = {}
         for _, root in ipairs(roots) do
             if root then
                 for _, object in ipairs(root:GetDescendants()) do
                     if object:IsA("ValueBase") and not seenValues[object] and not belongsToTool(object)
                         and not (playerGui and object:IsDescendantOf(playerGui)) then
-                        local parentIsLeaderstats = object.Parent and string.lower(object.Parent.Name) == "leaderstats"
-                        if parentIsLeaderstats or containsAny(fullName(object), INSPECTION_WORDS) then
+                        local directLeaderstat = leaderstats and object.Parent == leaderstats
+                        if directLeaderstat or containsAny(object.Name, INSPECTION_WORDS) then
                             seenValues[object] = true
                             local valueOk, value = pcall(function() return object.Value end)
                             if valueOk then table.insert(values, fullName(object) .. "=" .. formatValue(value)) end

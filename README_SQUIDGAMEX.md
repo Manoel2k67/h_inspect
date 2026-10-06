@@ -32,7 +32,7 @@ O jogo usa uma combinação de `Team`, atributos no objeto `Player`, ferramentas
 | Guarda | `Team="Guard"`, `IsGuard=true`, `GuardRank` e `ChatTag` | Confirmado |
 | Guarda Círculo | `GuardRank="Circle"`, `ChatTag="CIRCLE GUARD"` | Confirmado |
 | Guarda Triângulo | `GuardRank="Triangle"`, `ChatTag="TRIANGLE GUARD"` | Confirmado |
-| Frontman/Officer | `IsFrontman=true`, `IsGuard=true`, `GuardRank="Officer"`, `ChatTag="FRONTMAN"` e estados `FRONTMAN_RLGL` | Confirmado |
+| Frontman/Officer | `IsFrontman=true` como sinal principal; `GlassVision` e estados `FRONTMAN_*` como sinais adicionais | Confirmado; time e atributos de guarda variam por fase |
 | Visão de vidro | `GlassVision=true` | Atributo confirmado; efeito exato ainda provável |
 | Glass Maker | `GlassMaker=true` em um único jogador e UI `Main.Chances.Glassmaker` | Identificação do sorteado confirmada; somente ele vê os vidros na final |
 | Detetive | Interface `PlayerGui.DetectivePick.DetectivePick` e evidências em `Workspace.Data.Detective` | Mecânica confirmada; atributo do jogador desconhecido |
@@ -90,6 +90,45 @@ A interpretação mais consistente dos dois atributos é:
 | `GlassVision=true` | Permissão/capacidade de visão especial quando disponível |
 
 Na coleta feita antes da final, o Glass Maker já tinha `GlassMaker=true`, mas não expunha `GlassVision`. Isso sugere que a visão pode ser ativada somente quando a ponte começa. O Frontman e outro jogador possuíam `GlassVision` sem `GlassMaker`, então `GlassVision` não deve ser usado sozinho para identificar quem foi sorteado.
+
+Uma inspeção posterior do Frontman durante a fase Glass confirmou:
+
+```text
+Team = "Player"
+IsFrontman = true
+GlassVision = true
+PlayingGlass = true
+FRONTMAN_GLASS_PAIR_SELECTION = 10
+GlassMaker = ausente
+IsGuard/GuardRank = ausentes nessa amostra
+```
+
+Portanto, `IsFrontman=true` deve ser o detector principal. `Team="Guard"`, `IsGuard`, `GuardRank="Officer"` e `ChatTag="FRONTMAN"` apareceram em outra amostra, mas não são garantidos em todas as fases.
+
+Esse Frontman tinha `150/150` de vida, `JumpHeight=10.2` e `WalkSpeed=12`, enquanto o Glass Maker inspecionado anteriormente tinha `100/100`, `JumpHeight=7.2` e a mesma velocidade. Isso indica bônus de vida e pulo associado ao Frontman nessa amostra.
+
+Também estavam simultaneamente presentes `PlayingGlass=true`, `PlayingRLGL=true`, `FRONTMAN_RLGL=true` e `HONEYCOMB_SHAPE="Triangle"`. Alguns atributos de fases anteriores permanecem no jogador; o menu não deve considerar `PlayingRLGL` ou o prefixo da habilidade isoladamente como prova da fase atual. Quando `PlayingGlass=true`, ele é o sinal mais específico para a ponte.
+
+Segundo a observação direta da rodada, o Glass Maker é sorteado no lobby principal, antes da primeira partida. Uma inspeção individual feita posteriormente, durante Red Light, Green Light, confirmou que esse estado permanece no jogador:
+
+```text
+Player.GlassMaker = true
+Player.PlayingRLGL = true
+GlassVision = ausente
+
+Workspace.<jogador>.Head.Glassmaker
+class = BillboardGui
+enabled = true
+size = {7.5, 1}, {1.5, 1}
+studsOffset = (0.00, 5.00, 0.00)
+tags = {HideFromPlayer}
+```
+
+Portanto, o Glass Maker é definido no lobby e pode ser detectado antes mesmo do início dos minigames. O atributo continua presente durante Red Light, Green Light. O `BillboardGui` fornece um segundo sinal além do atributo. A tag `HideFromPlayer` sugere que o jogo controla quem pode enxergar esse marcador, mas seu significado exato ainda precisa ser testado.
+
+O personagem inspecionado tinha estatísticas normais (`100/100` de vida e `WalkSpeed=12`), indicando que o cargo não aplicava bônus físico evidente naquele momento.
+
+O melhor momento para investigar a atribuição do cargo é no lobby: salvar um snapshot antes do sorteio, comparar imediatamente depois e inspecionar o jogador marcado antes do teleporte para a primeira partida. Isso pode revelar o evento, interface ou objeto que concede `GlassMaker=true`.
 
 A estrutura da interface também contém missões de Battle Pass específicas:
 
@@ -267,8 +306,11 @@ Não é recomendado salvar coordenadas fixas enquanto houver um caminho de inst�
 | Pegar caixão | `Workspace.Data.IncinerationRoom.PickupCoffins.Coffin1..7.Main.Pickup` com ação `Pick Up` |
 | Pegar sniper | `Workspace.Map.RedLightGreenLight.SniperRoom.Bags.Bag.ProximityPrompt` com ação `Pickup Sniper` |
 | Trocar roupa de guarda | `Workspace.Data.WardrobeTriggers.OpenGuardWardrobe.ProximityPrompt` |
+| Carregar jogador | `Workspace.<jogador>.HumanoidRootPart.CarryPrompt` com ação `Carry` |
 
 No guarda-roupa, a ação observada foi `Switch Guard Skin`, com tags `DetectiveDisabled` e `GuardSkinSwitchPrompt`. A tag `DetectiveDisabled` pode ajudar a entender restrições do detetive, mas seu efeito ainda não foi testado.
+
+O `CarryPrompt` observado estava `Enabled=false`, com distância `5`, tempo de pressão `0.2` e tag `CarryPrompt`. Como só há uma inspeção individual desse sinal, ele não deve ser associado exclusivamente ao Glass Maker; provavelmente é uma interação geral de personagens.
 
 ## Descobertas das buscas em Estrutura
 
