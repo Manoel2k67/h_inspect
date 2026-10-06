@@ -626,7 +626,7 @@ A varredura de mapa em foco `Tudo` retornou centenas de interações gerais, pri
 
 ## Coleta passiva de remotes
 
-O H Inspect 2.5.0 possui uma categoria **Remotes**. Ela separa duas tarefas:
+O H Inspect 2.5.1 possui uma categoria **Remotes**. Ela separa duas tarefas:
 
 - **Varrer remotes:** cataloga `RemoteEvent`, `UnreliableRemoteEvent` e `RemoteFunction`, com caminho, classe, atributos, tags e contexto do pai.
 - **Monitor passivo:** registra somente `OnClientEvent`, ou seja, mensagens que o servidor já enviou ao cliente. Não chama `FireServer` ou `InvokeServer`.
@@ -634,13 +634,56 @@ O H Inspect 2.5.0 possui uma categoria **Remotes**. Ela separa duas tarefas:
 Fluxo recomendado para mapear uma mecânica:
 
 1. Escolher **ReplicatedStorage** e varrer com o filtro vazio para obter o inventário geral.
-2. Repetir com um filtro curto, por exemplo `glass, bridge`, `rope`, `bounty, reward`, `detective`, `door` ou `fork, dinner`.
-3. Configurar o filtro antes de iniciar o monitor passivo.
+2. Em **Filtro do caminho**, usar nomes observados como `GameStateUpdate`, `GamemodeAction`, `ReplicaSet`, `ReplicaWrite`, `Notify`, `SafeTP` e `SetLighting`, ou deixar vazio.
+3. Em **Filtro dos argumentos**, usar termos da mecânica, como `glass, bridge`, `rope`, `bounty, reward`, `detective`, `door` ou `fork, dinner`.
 4. Iniciar o monitor imediatamente antes da ação ou mudança de fase.
 5. Executar a ação normalmente, parar o monitor e copiar os eventos recebidos.
 6. Registrar junto o estado antes/depois, pois o nome do remote e seus argumentos precisam ser correlacionados com uma mudança observável.
 
 Limitação: esse monitor não mostra chamadas que um `LocalScript` faz do cliente para o servidor e não substitui `OnClientInvoke` de `RemoteFunction`, pois isso alteraria o comportamento do jogo. Mesmo sem esses hooks, o inventário e os eventos recebidos podem revelar anúncios de fase, alvos, recompensas, estado da ponte e atualizações de interface.
+
+### Amostra remota — encerramento do Pentathlon
+
+Uma coleta feita no final da partida revelou esta sequência:
+
+| Horário UTC | Remote | Argumentos relevantes |
+|---|---|---|
+| `22:27:49` | `Remotes.GamemodeAction` | `"CleanupGamemode"` |
+| `22:27:49` | `RemoteEvents.ReplicaSet` | `CompletedMaps`, `Pentathlon`, `count`, valor `0` |
+| `22:27:49` | `RemoteEvents.ReplicaSet` | `Gameplay`, `glassMakerChance`, valor `0` |
+| `22:27:49` | `RemoteEvents.ReplicaSet` | `Gameplay`, `babyChance`, valor `0` |
+| `22:28:00` | `Remotes.GameStateUpdate` | `"EndGamemode"`, `"Pentathlon"` |
+| `22:28:01` | `Remotes.SetLighting` | `"Lobby"` |
+| `22:28:01` | `Remotes.SafeTP` | `CFrame(8022.59, 90.83, 3730.97)` |
+
+Isso indica um fluxo observável de limpeza da fase, atualização do estado final, restauração da iluminação e teleporte seguro ao lobby. `ReplicaSet` aparenta atualizar uma árvore de dados do jogador; `Gameplay.glassMakerChance` é especialmente útil para acompanhar a chance mostrada na interface. O valor `0` foi observado no encerramento e não deve ser interpretado como valor permanente.
+
+`Notify` disparou cinco vezes, mas a primeira versão do serializador truncou `messages` em `{...}`. A versão 2.5.1 aumenta a profundidade das tabelas para capturar texto, tipo e demais campos internos. `ReplicaWrite` informou três argumentos, mas não preservou seus slots nessa primeira coleta; a versão 2.5.1 agora numera cada argumento explicitamente, inclusive quando o valor é `nil`.
+
+### Amostra remota — morte do portador do bebê
+
+O bebê é concedido a um participante no lobby da partida, durante a seleção de cargos. Se o portador vencer levando o bebê, a recompensa final é multiplicada por `2x`.
+
+Uma coleta feita quando o jogador local morreu registrou:
+
+| Horário UTC | Remote | Argumentos relevantes |
+|---|---|---|
+| `22:29:32` | `Remotes.Notify` | mensagem ainda truncada na versão antiga |
+| `22:29:53` | `RemoteEvents.ReplicaSet` | caminho `SprintSpeed`, valor `0` |
+| `22:29:54` | `Remotes.BabyAction` | `"dropBaby"`, `CFrame(-1234.34, 208.52, 7.08)`, identificador `"186"` |
+| `22:29:57` | `Remotes.BabyAction` | `"cleanUp"` |
+| `22:30:00` | `Remotes.SetLighting` | `"MusicalChairsDark"` |
+
+`BabyAction` já permite implementar um rastreador passivo:
+
+- `dropBaby` abre o estado **bebê derrubado**, fornece a posição e um identificador da instância/entidade;
+- `cleanUp` encerra esse estado e deve remover qualquer marcador local;
+- o `CFrame` permite mostrar a última posição conhecida do bebê;
+- o identificador `"186"` não deve ser tratado como `UserId` sem outra amostra que demonstre essa relação.
+
+`SprintSpeed=0` ocorreu perto da morte, mas ainda pode representar imobilização, transição ou espectador. `MusicalChairsDark` identifica o estado de iluminação da fase, porém também não prova morte isoladamente. Para um detector confiável, combinar `Humanoid.Died`, atributo `Dead` e `BabyAction("dropBaby")` quando o jogador era o portador.
+
+Ainda falta capturar `BabyAction` no momento da entrega, coleta ou transferência do bebê. A próxima coleta deve começar antes do sorteio no lobby e continuar até o início da primeira fase. Logo depois de `dropBaby`, também é útil varrer **Mapa**, **Itens** e **Estrutura** com o filtro `baby` para localizar o objeto físico criado.
 
 ## Arquitetura sugerida para um menu específico
 
@@ -652,7 +695,8 @@ Com base no que já foi confirmado, um futuro menu para o Squid Game X pode ser 
 4. **Portas** — registrar `DoorAccess`, forma exigida, prompts e caminho físico correspondente.
 5. **Ponte de vidro** — listar os pares, marcar lado real/falso por `CanCollide`, validar com `Size.Z` e acompanhar painéis quebrados.
 6. **Interações** — catálogo de elevadores, CCTV, incinerador, guarda-roupa e pickups.
-7. **Diagnóstico** — exibir caminho completo, classe, atributos, tags e alterações em tempo real.
+7. **Bebê** — portador atual quando identificável, multiplicador `2x`, última posição de `dropBaby` e limpeza por `cleanUp`.
+8. **Diagnóstico** — exibir caminho completo, classe, atributos, tags e alterações em tempo real.
 
 Uma regra importante: cada módulo deve procurar instâncias e atributos por nome/caminho em tempo de execução. Não deve depender de um único jogador, `JobId` ou posição capturada neste relatório.
 

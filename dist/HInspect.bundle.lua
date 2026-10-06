@@ -1552,7 +1552,8 @@ return {
             Icon = "search",
             Controls = {
                 { Kind = "Dropdown", Setting = "RemoteScope", Id = "remote_scope", Label = "Escopo", Options = { "ReplicatedStorage", "Workspace", "Tudo replicado" }, Default = "ReplicatedStorage", UseList = true },
-                { Kind = "Input", Setting = "RemoteFilter", Id = "remote_filter", Label = "Filtro", Placeholder = "glass, rope, bounty, door...", Default = "" },
+                { Kind = "Input", Setting = "RemoteFilter", Id = "remote_filter", Label = "Filtro do caminho", Placeholder = "GameStateUpdate, ReplicaSet, Notify...", Default = "" },
+                { Kind = "Input", Setting = "RemotePayloadFilter", Id = "remote_payload_filter", Label = "Filtro dos argumentos", Placeholder = "glass, rope, bounty, reward...", Default = "" },
                 { Kind = "Slider", Setting = "MaxRemoteResults", Id = "max_remote_results", Label = "Máximo de remotes", Min = 20, Max = 300, Default = 150, Step = 10 },
                 { Kind = "Button", Setting = "ScanRemotes", Id = "scan_remotes", Label = "Varrer remotes", Description = "Lista RemoteEvent, UnreliableRemoteEvent e RemoteFunction sem chamar o servidor.", ButtonText = "Varrer" },
                 { Kind = "Button", Setting = "CopyRemoteReport", Id = "copy_remote_report", Label = "Copiar inventário", ButtonText = "Copiar" },
@@ -1563,7 +1564,7 @@ return {
             Icon = "info",
             Controls = {
                 { Kind = "Slider", Setting = "MaxRemoteLog", Id = "max_remote_log", Label = "Máximo de eventos no histórico", Min = 20, Max = 300, Default = 120, Step = 10 },
-                { Kind = "Button", Setting = "StartRemoteMonitor", Id = "start_remote_monitor", Label = "Iniciar monitor passivo", Description = "Observa somente eventos enviados pelo servidor ao cliente que correspondem ao filtro.", ButtonText = "Iniciar" },
+                { Kind = "Button", Setting = "StartRemoteMonitor", Id = "start_remote_monitor", Label = "Iniciar monitor passivo", Description = "Conecta pelos caminhos escolhidos e pode filtrar o conteúdo recebido sem enviar nada ao servidor.", ButtonText = "Iniciar" },
                 { Kind = "Button", Setting = "StopRemoteMonitor", Id = "stop_remote_monitor", Label = "Parar monitor", ButtonText = "Parar" },
                 { Kind = "Button", Setting = "CopyRemoteLog", Id = "copy_remote_log", Label = "Copiar eventos recebidos", ButtonText = "Copiar" },
                 { Kind = "Button", Setting = "ClearRemoteLog", Id = "clear_remote_log", Label = "Limpar histórico", ButtonText = "Limpar" },
@@ -2241,22 +2242,28 @@ local function formatRemoteArgument(value, depth, seen)
         return string.format("%q", text)
     end
     if valueType ~= "table" then return formatValue(value) end
-    if depth >= 2 then return "{...}" end
+    if depth >= 4 then return "{...}" end
     if seen[value] then return "{<ciclo>}" end
     seen[value] = true
 
     local entries = {}
+    local totalEntries = 0
     for key, item in pairs(value) do
-        table.insert(entries, {
-            Key = formatRemoteArgument(key, depth + 1, seen),
-            Value = formatRemoteArgument(item, depth + 1, seen),
-        })
-        if #entries >= 12 then break end
+        totalEntries = totalEntries + 1
+        if #entries < 24 then
+            table.insert(entries, {
+                Key = formatRemoteArgument(key, depth + 1, seen),
+                Value = formatRemoteArgument(item, depth + 1, seen),
+            })
+        end
     end
     table.sort(entries, function(a, b) return a.Key < b.Key end)
     local parts = {}
     for _, entry in ipairs(entries) do
         table.insert(parts, "[" .. entry.Key .. "]=" .. entry.Value)
+    end
+    if totalEntries > #entries then
+        table.insert(parts, string.format("... +%d entradas", totalEntries - #entries))
     end
     seen[value] = nil
     return "{" .. table.concat(parts, ", ") .. "}"
@@ -2307,6 +2314,7 @@ function Inspector:Create(options)
         MaxStructureResults = 200,
         RemoteScope = "ReplicatedStorage",
         RemoteFilter = "",
+        RemotePayloadFilter = "",
         MaxRemoteResults = 150,
         MaxRemoteLog = 120,
         SnapshotScope = "Tudo relevante",
@@ -3039,7 +3047,7 @@ function Inspector:Create(options)
         local lines = {
             sessionHeader("REMOTES — " .. settings.RemoteScope),
             "",
-            "Filtro: " .. (settings.RemoteFilter ~= "" and settings.RemoteFilter or "(nenhum)"),
+            "Filtro do caminho: " .. (settings.RemoteFilter ~= "" and settings.RemoteFilter or "(nenhum)"),
             string.format("Objetos lidos: %d | remotes: %d | exibindo: %d", scanned, #matches, maximum),
             "Observação: esta coleta não chama FireServer nem InvokeServer.",
             "",
@@ -3084,7 +3092,8 @@ function Inspector:Create(options)
             sessionHeader("EVENTOS REMOTOS RECEBIDOS"),
             "",
             "Escopo: " .. settings.RemoteScope,
-            "Filtro: " .. (settings.RemoteFilter ~= "" and settings.RemoteFilter or "(nenhum)"),
+            "Filtro do caminho: " .. (settings.RemoteFilter ~= "" and settings.RemoteFilter or "(nenhum)"),
+            "Filtro dos argumentos: " .. (settings.RemotePayloadFilter ~= "" and settings.RemotePayloadFilter or "(nenhum)"),
             string.format("Eventos preservados: %d | limite: %d", #remoteLog, settings.MaxRemoteLog),
             "Somente OnClientEvent; nenhum remote foi disparado pelo H Inspect.",
             "",
@@ -3117,15 +3126,18 @@ function Inspector:Create(options)
         local packed = table.pack(...)
         local arguments = {}
         for index = 1, packed.n do
-            table.insert(arguments, formatRemoteArgument(packed[index], 0, {}))
+            arguments[index] = string.format("[%d]=%s", index,
+                formatRemoteArgument(packed[index], 0, {}))
         end
         local path = fullName(remote)
+        local argumentText = packed.n > 0 and table.concat(arguments, " | ") or "(nenhum)"
+        if not matchesCommaFilter(path .. " " .. argumentText, settings.RemotePayloadFilter) then return end
         remoteEventCounts[path] = (remoteEventCounts[path] or 0) + 1
         table.insert(remoteLog, {
             Time = utcTimestamp(),
             Path = path,
             ArgumentCount = packed.n,
-            Arguments = #arguments > 0 and table.concat(arguments, " | ") or "(nenhum)",
+            Arguments = argumentText,
         })
         while #remoteLog > settings.MaxRemoteLog do table.remove(remoteLog, 1) end
         local now = os.clock()
@@ -3165,8 +3177,9 @@ function Inspector:Create(options)
         end
         for _ in pairs(monitoredRemotes) do monitoredCount = monitoredCount + 1 end
         update("remote_status", "Monitor passivo ativo",
-            string.format("Observando %d RemoteEvents | filtro: %s", monitoredCount,
-                settings.RemoteFilter ~= "" and settings.RemoteFilter or "nenhum"))
+            string.format("Observando %d RemoteEvents | caminho: %s | argumentos: %s", monitoredCount,
+                settings.RemoteFilter ~= "" and settings.RemoteFilter or "todos",
+                settings.RemotePayloadFilter ~= "" and settings.RemotePayloadFilter or "todos"))
         update("remote_report", "Prévia dos eventos recebidos", preview(buildRemoteLogReport(), 3000))
     end
 
@@ -3423,7 +3436,7 @@ function Inspector:Create(options)
             or name == "SnapshotScope" or name == "WorldFilter" or name == "GuiFilter"
             or name == "StructureFilter" or name == "SnapshotFilter"
             or name == "SelectedPlayer" or name == "RemoteScope"
-            or name == "RemoteFilter" then
+            or name == "RemoteFilter" or name == "RemotePayloadFilter" then
             settings[name] = tostring(value)
             if name == "SelectedPlayer" then
                 update("selected_player_status", "Alvo selecionado", settings.SelectedPlayer

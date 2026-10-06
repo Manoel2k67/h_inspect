@@ -66,13 +66,13 @@ Essa regra é específica da estrutura atualmente observada no Squid Game X e de
 ## Como coletar remotes
 
 1. Abra **Remotes** e comece com o escopo **ReplicatedStorage**.
-2. Para inventariar tudo, deixe o filtro vazio. Para uma mecânica específica, use termos separados por vírgula, como `glass, rope, bounty, reward, detective, door, fork, dinner`.
+2. Para inventariar tudo, deixe **Filtro do caminho** vazio. Para reduzir a lista, use nomes de remotes, como `GameStateUpdate, GamemodeAction, ReplicaSet, ReplicaWrite, Notify, SafeTP`.
 3. Clique em **Varrer remotes** e depois em **Copiar inventário**.
-4. Para observar uma fase, configure o filtro antes e clique em **Iniciar monitor passivo**.
+4. Para observar uma fase, deixe o caminho vazio ou selecione os remotes genéricos acima. Em **Filtro dos argumentos**, use termos da mecânica, como `glass, rope, bounty, reward, detective, door, fork, dinner`.
 5. Execute normalmente a ação no jogo, como entrar na ponte, receber recompensa ou começar uma fase.
 6. Clique em **Parar monitor** e depois em **Copiar eventos recebidos**.
 
-O monitor registra caminho, horário e argumentos de mensagens `OnClientEvent` enviadas pelo servidor ao cliente. Ele lista `RemoteFunction`, mas não substitui `OnClientInvoke` e não intercepta chamadas feitas pelo cliente ao servidor. Filtros menores reduzem ruído e custo durante fases movimentadas.
+O monitor registra caminho, horário e argumentos de mensagens `OnClientEvent` enviadas pelo servidor ao cliente. O filtro do caminho decide a quais eventos conectar; o filtro dos argumentos é aplicado depois que a mensagem chega. Ele lista `RemoteFunction`, mas não substitui `OnClientInvoke` e não intercepta chamadas feitas pelo cliente ao servidor. Filtros menores reduzem ruído e custo durante fases movimentadas.
 
 ## Arquitetura
 
@@ -116,7 +116,7 @@ As URLs atuais usam o repositório público `Manoel2k67/h_inspect`, branch `main
 git init
 git branch -M main
 git add .
-git commit -m "H Inspect 2.5.0 - monitor passivo de remotes"
+git commit -m "H Inspect 2.5.1 - argumentos remotos detalhados"
 git remote add origin https://github.com/Manoel2k67/h_inspect.git
 git push -u origin main
 ```
