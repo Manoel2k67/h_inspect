@@ -11,6 +11,7 @@ Este documento reúne o que o **H Inspect** conseguiu observar no jogo **Squid G
 | A | `2026-10-06T15:46:00Z` | `7559074529` | `44d99d26-74eb-445c-8854-df3ccb9b77e5` | `Workspace.Map.RedLightGreenLight` carregado |
 | B | `2026-10-06T15:53:09Z` | `7559074529` | `083a3d85-b7c4-4abb-b2b4-4980c119b7c8` | Glass Maker, Frontman/Officer, armas e evidências do detetive |
 | C | `2026-10-06T16:09:10Z` | `7559074529` | `083a3d85-b7c4-4abb-b2b4-4980c119b7c8` | Fase Glass ativa e estado especial do Frontman |
+| D | `2026-10-07T01:38:54Z` | `7559074529` | `8efc68c6-7257-468c-928f-61f8f8956fcf` | Hide and Seek, time vermelho e ferramenta `Knife` |
 
 O `GameId` permaneceu `2936053166` e o `SourcePlaceId` observado nos jogadores permaneceu `7554888362`.
 
@@ -37,6 +38,7 @@ O jogo usa uma combinação de `Team`, atributos no objeto `Player`, ferramentas
 | Glass Maker | `GlassMaker=true` em um único jogador e UI `Main.Chances.Glassmaker` | Identificação do sorteado confirmada; somente ele vê os vidros na final |
 | Portador do bebê | `HasBaby=true`, `BabyType` e acessório `BabyBack` | Confirmado |
 | Detetive | Interface `PlayerGui.DetectivePick.DetectivePick` e evidências em `Workspace.Data.Detective` | Mecânica confirmada; atributo do jogador desconhecido |
+| Hide and Seek — time vermelho | `PlayingHideNSeek=true`, `HideNSeek_Team="red"`, `HideNSeek_Equipment=true` e `Knife` | Conjunto observado diretamente em uma amostra; a relação exata entre time e equipamento ainda precisa de comparação |
 
 ### Guardas encontrados
 
@@ -236,6 +238,7 @@ Os nomes dos atributos são confirmados. A descrição funcional é uma interpre
 | Item | Quem usa | Onde aparece | Dados |
 |---|---|---|---|
 | `Push` | Jogador comum | `Backpack` ou `Character` | - |
+| `Knife` | Participante do Hide and Seek; time vermelho na amostra | `Backpack` ou `Character` | tag `HideNSeekTool`, sons `Swing` e `Hit` |
 | `MPS-5` | Guardas | `Character` dos guardas | `AmmoCapacity=30`, `HitDamage=10`, `Automatic` |
 | `Revolver` | Frontman/Officer | `Backpack` ou `Character` | `AmmoCapacity=6`, `HitDamage=40` |
 | `Fork` | Fase do jantar | `Backpack` ou `Character` | - |
@@ -268,6 +271,51 @@ Tags = {GamemodeSound, Sound}
 ```
 
 Na amostra, o `Push` do jogador local estava no `Backpack`. Em outros jogadores, quando apareceu dentro do personagem, estava equipado.
+
+### Knife do Hide and Seek
+
+A amostra D confirmou uma `Tool` chamada `Knife` na mochila do jogador local durante Hide and Seek:
+
+```text
+Players.Manoel2k67.Backpack.Knife
+  tags = {HideNSeekTool}
+
+Players.Manoel2k67.Backpack.Knife.Hit
+  class = Sound
+  SoundId = "rbxassetid://4678745096"
+  tags = {GamemodeSound, Sound}
+
+Players.Manoel2k67.Backpack.Knife.Swing
+  class = Sound
+  SoundId = "rbxassetid://9116197044"
+  tags = {GamemodeSound, Sound}
+
+Players.Manoel2k67.Backpack.Knife.Knife
+  class = Script
+
+Players.Manoel2k67.Backpack.Knife.Knife.Knife
+  class = Part
+  size = (0.62, 0.60, 3.37)
+  transparency = 1
+  anchored = true
+  CanCollide = false
+  CanTouch = true
+  tags = {CanTouchRequired}
+```
+
+A ferramenta estava guardada, não equipada. Os atributos simultâneos do `Player` eram:
+
+```text
+PlayingHideNSeek = true
+HideNSeek_Team = "red"
+HideNSeek_Equipment = true
+```
+
+O `Character` também possuía `RAGDOLL_FORCE_DISABLE=true`. Isso pode estar relacionado à fase ou a outro estado do personagem; uma única amostra não permite associá-lo diretamente à faca.
+
+Na mesma coleta, o Humanoid tinha `130/130` de vida, `WalkSpeed=25`, `JumpPower=50` e `JumpHeight≈15.64`. O `Player` expunha `Player_Jump_Height=9.2`. Esses valores são estado observado, não configuração confirmada da `Knife` ou do time vermelho.
+
+Ainda não foram observados alcance, dano, cooldown, remote de ataque ou mudança causada ao alvo. Para confirmar o comportamento, é necessário comparar uma amostra com a faca guardada, outra equipada e uma terceira imediatamente após um ataque acertar.
 
 ### MPS-5
 
@@ -835,7 +883,7 @@ Com base no que já foi confirmado, um futuro menu para o Squid Game X pode ser 
 
 1. **Cargos** — listar time, `IsGuard`, `GuardRank`, `IsFrontman`, `GlassMaker`, `GlassVision` e o futuro sinal de detetive.
 2. **Estado da fase** — mostrar `PlayingRLGL`, `IsInsideRLGL`, segurança, vencedor, penalidades, proteção e cooldowns.
-3. **Itens** — informar ferramentas na mão e na mochila, incluindo `Push`, `MPS-5` e `Revolver`.
+3. **Itens** — informar ferramentas na mão e na mochila, incluindo `Push`, `Knife`, `MPS-5` e `Revolver`.
 4. **Portas** — registrar `DoorAccess`, forma exigida, prompts e caminho físico correspondente.
 5. **Ponte de vidro** — listar os pares, marcar lado real/falso por `CanCollide`, validar com `Size.Z` e acompanhar painéis quebrados.
 6. **Interações** — catálogo de elevadores, CCTV, incinerador, guarda-roupa e pickups.
@@ -859,6 +907,8 @@ Guard
 Detective
 Frontman
 Push
+Knife
+HideNSeek
 MPS-5
 RLGL
 armrydoor
@@ -895,6 +945,8 @@ Use o filtro na categoria correta:
 - detector separado de `GlassMaker` e `GlassVision`;
 - estado do Red Light, Green Light;
 - item equipado versus item na mochila;
+- detector da fase e do time de Hide and Seek por `PlayingHideNSeek` e `HideNSeek_Team`;
+- detector da `Knife` pela Tool e pela tag `HideNSeekTool`;
 - leitura das configurações de `MPS-5` e `Revolver`;
 - registro das portas `Square+` e `Triangle+`;
 - registro dinâmico das evidências do Detetive;
@@ -908,6 +960,8 @@ Use o filtro na categoria correta:
 - efeito visual exato aplicado por `GlassVision` no cliente;
 - momento exato em que o jogo concede `GlassVision` ao jogador com `GlassMaker=true`;
 - atributos e escolhas do Detetive;
+- dano, alcance, cooldown e remote de ataque da `Knife`;
+- confirmação da relação entre time vermelho, `HideNSeek_Equipment` e recebimento da `Knife`;
 - acesso do Guarda Círculo;
 - remotes usados pelas fases e interações;
 - sequência completa das rotas de fuga.
@@ -931,4 +985,4 @@ Para cada descoberta, guarde o caminho completo, classe da instância, atributos
 
 ---
 
-Última análise deste documento: `2026-10-06`. As descobertas combinam os snapshots do H Inspect com a coleta complementar que confirmou a estrutura e a colisão dos painéis da ponte.
+Última análise deste documento: `2026-10-07`. As descobertas combinam os snapshots do H Inspect, a coleta complementar da ponte e a inspeção individual da fase Hide and Seek.
