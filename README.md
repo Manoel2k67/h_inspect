@@ -12,6 +12,7 @@ As operações do H Inspect são somente de leitura: ele não abre portas, não 
 - **Mapa:** portas, saídas, prompts, detectores, vidros, pontes, peças de material `Glass` e pistas visuais como `Highlight`, `SelectionBox`, decal, textura, `SurfaceAppearance`, `Beam` e GUI de mundo. A coleta agrupa objetos por assinatura e por pai/par, registra irmãos e filhos e pode ser copiada diretamente na aba.
 - **Estrutura:** busca livre em `ReplicatedStorage`, `Workspace`, `PlayerGui` ou personagem. Sem filtro, prioriza Values, Tools, remotes, módulos, prompts, tags e atributos.
 - **Remotes:** inventário de `RemoteEvent`, `UnreliableRemoteEvent` e `RemoteFunction`, além de monitor passivo de eventos recebidos por `OnClientEvent`. O inspetor não chama `FireServer` nem `InvokeServer`.
+- **Bebê:** coleta guiada para soltar e pegar o bebê, reunindo estado local, eventos recebidos, objetos temporários próximos ao `dropBaby` e, quando o executor permite, observação passiva das chamadas que o próprio jogo envia durante o pickup.
 - **Comparação:** snapshot A e estado atual, destacando objetos adicionados, removidos ou alterados.
 - **Sessão:** `PlaceId`, `GameId`, `JobId` e horário UTC.
 
@@ -55,13 +56,22 @@ Essa regra é específica da estrutura atualmente observada no Squid Game X e de
 1. **Início**
 2. **Jogadores**
 3. **Itens**
-4. **Interface**
-5. **Mapa**
-6. **Estrutura**
-7. **Remotes**
-8. **Comparar**
-9. **Relatórios**
-10. **Configurações**
+4. **Bebê**
+5. **Interface**
+6. **Mapa**
+7. **Estrutura**
+8. **Remotes**
+9. **Comparar**
+10. **Relatórios**
+11. **Configurações**
+
+## Coleta guiada do bebê
+
+1. Abra **Bebê** enquanto ainda estiver carregando e clique em **Iniciar**.
+2. Solte o bebê e pegue-o novamente da forma normal.
+3. Clique em **Analisar** ou diretamente em **Copiar**.
+
+O relatório combina `BabyAction`, mudanças de `SprintSpeed`, atributos e objetos do jogador, instâncias adicionadas/removidas no `Workspace` e uma varredura ao redor do `CFrame` de `dropBaby`. Quando `hookmetamethod` e `getnamecallmethod` estão disponíveis, também registra passivamente `FireServer` e `InvokeServer` executados pelo próprio jogo durante o teste. A coleta não dispara nenhuma dessas chamadas.
 
 ## Como coletar remotes
 
@@ -83,6 +93,7 @@ HInspectConfig.lua            identidade, tema, tamanho, atalhos e categorias
 HInspectSchema.lua            contratos das definições
 categories/                   páginas declarativas do inspetor
 runtime/Inspector.lua         coleta, comparação e exportação
+runtime/Baby.lua              investigação guiada de drop e pickup do bebê
 runtime/Settings.lua          seleção do tema
 theme/wallpapers/             assets opcionais dos temas
 dist/HInspect.bundle.lua      artefato gerado usado no executor
@@ -116,7 +127,7 @@ As URLs atuais usam o repositório público `Manoel2k67/h_inspect`, branch `main
 git init
 git branch -M main
 git add .
-git commit -m "H Inspect 2.6.0 - detector do portador do bebê"
+git commit -m "H Inspect 2.7.0 - coleta guiada do bebê"
 git remote add origin https://github.com/Manoel2k67/h_inspect.git
 git push -u origin main
 ```

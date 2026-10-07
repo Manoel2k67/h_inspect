@@ -877,6 +877,20 @@ A coleta desde o encerramento da seleção de times até a contagem da primeira 
 
 Há uma divergência importante: `StartShowGlassMaker` recebeu `"Manoel2k67"`, mas a notificação informou que o escolhido era `owertresmil1`. Portanto, o segundo argumento de `StartShowGlassMaker` não deve ser usado como identidade do Glass Maker. Para isso, preferir `GlassMaker=true`, o BillboardGui e o nome exibido em `Notify`.
 
+### Coleta guiada de drop e pickup
+
+O H Inspect 2.7.0 adiciona a categoria **Bebê** para concentrar em um único relatório o teste controlado de soltar e pegar novamente. O fluxo é iniciar a coleta ainda carregando, executar as duas ações normalmente e copiar o resultado.
+
+A coleta registra:
+
+- estado inicial e final do jogador, incluindo atributos, `leaderstats`, Humanoid e objetos relacionados ao bebê;
+- todos os `OnClientEvent` recebidos durante o intervalo;
+- instâncias adicionadas e removidas no `Workspace`;
+- objetos, prompts e detectores próximos ao `CFrame` de `dropBaby` em três momentos;
+- quando suportado pelo executor, chamadas `FireServer` e `InvokeServer` feitas pelo próprio jogo durante o pickup.
+
+Esse último item é observação passiva e não dispara remotes. Ele serve para distinguir pickup por `ProximityPrompt`, `TouchTransmitter` ou `ClickDetector` de uma solicitação explícita cliente → servidor. Se o executor não fornecer os hooks necessários, o relatório registra essa limitação em vez de concluir incorretamente que não houve chamada.
+
 ## Arquitetura sugerida para um menu específico
 
 Com base no que já foi confirmado, um futuro menu para o Squid Game X pode ser dividido assim:

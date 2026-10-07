@@ -97,6 +97,7 @@ Config.CategoryModules = {
     "categories/Home.lua",
     "categories/Players.lua",
     "categories/Items.lua",
+    "categories/Baby.lua",
     "categories/Interface.lua",
     "categories/World.lua",
     "categories/Explorer.lua",
