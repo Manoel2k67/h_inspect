@@ -12,6 +12,7 @@ Este documento reúne o que o **H Inspect** conseguiu observar no jogo **Squid G
 | B | `2026-10-06T15:53:09Z` | `7559074529` | `083a3d85-b7c4-4abb-b2b4-4980c119b7c8` | Glass Maker, Frontman/Officer, armas e evidências do detetive |
 | C | `2026-10-06T16:09:10Z` | `7559074529` | `083a3d85-b7c4-4abb-b2b4-4980c119b7c8` | Fase Glass ativa e estado especial do Frontman |
 | D | `2026-10-07T01:38:54Z` | `7559074529` | `8efc68c6-7257-468c-928f-61f8f8956fcf` | Hide and Seek, time vermelho e ferramenta `Knife` |
+| E | `2026-10-07T19:45:59Z` | `7559074529` | `9ceb5503-2f61-494c-9154-1f0d5dcbca95` | Dois pickups do bebê, estrutura `Workspace.BabyPickup` e `PickupPrompt` confirmados |
 
 O `GameId` permaneceu `2936053166` e o `SourcePlaceId` observado nos jogadores permaneceu `7554888362`.
 
@@ -841,7 +842,7 @@ Nessa amostra, carregar o bebê reduziu `SprintSpeed` de `21` para `16.6`, uma d
 
 `SprintSpeed=0` ocorreu perto da morte, mas ainda pode representar imobilização, transição ou espectador. `MusicalChairsDark` identifica o estado de iluminação da fase, porém também não prova morte isoladamente. Para um detector confiável, combinar `Humanoid.Died`, atributo `Dead` e `BabyAction("dropBaby")` quando o jogador era o portador.
 
-Não apareceu um comando com nome explícito `pickupBaby`; a coleta controlada mostrou que o pickup é representado por `cleanUp` junto da redução de `SprintSpeed`. Como `cleanUp` também pode ser usado para despawn, o menu deve combinar os dois sinais.
+Não apareceu um comando remoto recebido com nome explícito `pickupBaby`; a coleta controlada mostrou que o pickup é confirmado por `cleanUp` junto da redução de `SprintSpeed`. A amostra E identificou posteriormente a interação física responsável: `Workspace.BabyPickup.Trigger.PickupPrompt`.
 
 O portador pode ser identificado diretamente pelos dados replicados do `Player`:
 
@@ -860,6 +861,118 @@ Ordem recomendada para o detector:
 4. `leaderstats.Id` para relacionar o portador ao terceiro argumento de `dropBaby`.
 
 Na amostra, o portador tinha `WalkSpeed=12`, `JumpHeight=6.2` e o `Push` equipado. Esses números podem sofrer penalidades ou bônus e não devem substituir `HasBaby` como detector.
+
+### Pickup físico confirmado — amostra E
+
+A coleta guiada da amostra E permaneceu ativa durante a morte de um portador informado como Javier, o primeiro pickup do bebê deixado por ele, um drop manual do jogador local e o segundo pickup. Apesar do ruído causado pela duração de aproximadamente 11 minutos, os dois pickups convergiram para a mesma estrutura e para a mesma interação.
+
+O bebê derrubado aparece como:
+
+```text
+Workspace.BabyPickup
+├─ Parts
+│  ├─ Main
+│  ├─ Plane
+│  ├─ Plane.001
+│  ├─ Collisions
+│  ├─ Head
+│  └─ Cylinder.001
+└─ Trigger
+   ├─ Main
+   ├─ PickupPrompt
+   ├─ WeldConstraint
+   └─ BillboardGui
+```
+
+O modelo `Workspace.BabyPickup` foi observado com a tag `SERVER_HANDLED`. O objeto de interação confirmado é:
+
+```text
+Workspace.BabyPickup.Trigger.PickupPrompt
+class = ProximityPrompt
+ActionText = "Pick up"
+ObjectText = "Baby"
+Enabled = true
+MaxActivationDistance = 5
+HoldDuration = 0.5
+RequiresLineOfSight = false
+KeyboardKeyCode = E
+```
+
+O `Trigger` é uma peça transparente de aproximadamente `(1.20, 1.79, 1.20)`, com `CanCollide=false`, `CanTouch=false` e `CanQuery=false`. Portanto, o pickup não depende de tocar fisicamente nessa peça; a evidência direta é o `ProximityPrompt`.
+
+#### Primeiro pickup — bebê deixado pelo portador morto
+
+| Tempo relativo | Sinal observado |
+|---|---|
+| `+632.814s` | `BabyAction("dropBaby", CFrame(7998.13, 93.61, 3766.49), "370")` |
+| `+633.118s` | `PickupPrompt` ficou visível para o jogador local |
+| `+633.954s` | `ProximityPromptService.PromptTriggered`, prompt acionado por `Players.Manoel2k67` |
+| `+633.998s` | `ReplicaSet` alterou `SprintSpeed` para `16.6` |
+| `+634.045s` | `BabyAction("cleanUp")` confirmou a remoção do bebê do chão |
+
+O identificador `"370"` pertence ao portador que derrubou o bebê nessa sequência. Como nas amostras anteriores, ele deve ser tratado como `leaderstats.Id`, não como `UserId`.
+
+#### Segundo pickup — drop do próprio jogador
+
+O jogador local tinha `leaderstats.Id="217"`. A sequência foi:
+
+| Tempo relativo | Sinal observado |
+|---|---|
+| `+651.192s` | `HasBaby` foi removido |
+| `+651.193s` | `SprintSpeed` voltou para `21` |
+| `+651.204s` | `BabyType` foi removido e chegou `dropBaby`, posição `(7984.56, 131.37, 3705.43)`, ID `"217"` |
+| `+651.427s` | `Workspace.BabyPickup` foi adicionado, cerca de `0.22s` depois do remote |
+| `+651.434s` | `PickupPrompt` ficou visível |
+| `+652.534s` | `PromptTriggered` foi disparado por `Players.Manoel2k67` |
+| `+652.583s` | `HasBaby=true` e `SprintSpeed=16.6` |
+| `+652.592s` | `BabyType="BACK"` e `BabyAction("cleanUp")` |
+
+Depois do pickup, também foram observados:
+
+```text
+BABY_POSITIONING_RESTRICTION = true
+CURRENT_IDLE_ANIM = "rbxassetid://90000209271852"
+CURRENT_WALK_ANIM = "rbxassetid://99289169949891"
+Character.BabyBack = Accessory
+Character.RightHand.BabyFront = Model
+```
+
+`HasBaby=true` continua sendo o detector principal. `BabyType`, `BabyBack`, `BabyFront`, as animações e a restrição de posicionamento são sinais complementares. A presença simultânea de `BabyType="BACK"` e um modelo chamado `BabyFront` mostra que o nome visual não deve substituir o atributo na identificação da variante.
+
+#### Movimento do objeto no chão
+
+O `CFrame` de `dropBaby` é a posição inicial conhecida, mas o modelo pode cair ou se acomodar fisicamente antes do pickup. No segundo teste:
+
+```text
+dropBaby:              Y = 131.37
+prompt quando exibido: Y = 130.76
+prompt no pickup:      Y = 128.87
+```
+
+Assim, um rastreador deve usar o `CFrame` somente enquanto `Workspace.BabyPickup` ainda não existir. Depois que o modelo for replicado, deve acompanhar a posição atual de `BabyPickup.Trigger` ou do próprio `PickupPrompt`.
+
+#### Implicações para pickup automático sem teleporte
+
+Já está confirmado que o alvo correto é o `ProximityPrompt`; não há motivo para procurar um `TouchTransmitter` ou `ClickDetector` do bebê. Uma implementação experimental pode:
+
+1. observar `Workspace.ChildAdded` ou aguardar `Workspace:FindFirstChild("BabyPickup")` após `BabyAction("dropBaby")`;
+2. resolver dinamicamente `BabyPickup.Trigger.PickupPrompt`;
+3. ignorar a tentativa se o jogador local já tiver `HasBaby=true`;
+4. usar uma trava para não acionar o mesmo prompt várias vezes simultaneamente;
+5. quando o executor disponibilizar `fireproximityprompt`, tentar o prompt normalmente;
+6. considerar sucesso somente quando surgir `HasBaby=true`, chegar `cleanUp` ou `Workspace.BabyPickup` for removido;
+7. liberar a trava após sucesso, remoção do modelo ou timeout.
+
+Ainda **não está confirmado** que `fireproximityprompt` funciona a mais de `5` studs. `MaxActivationDistance=5` e a tag `SERVER_HANDLED` indicam que pode existir validação de distância no servidor. O teste decisivo deve ser feito parado a mais de `5` studs, sem mover o personagem, acionando apenas o prompt e observando se `HasBaby`, `SprintSpeed`, `cleanUp` e a remoção do modelo confirmam o pickup.
+
+Se essa tentativa for rejeitada, não se deve concluir que outro remote conhecido resolve o problema. Nesta amostra, `hookmetamethod/getnamecallmethod` estavam indisponíveis e nenhuma chamada cliente → servidor pôde ser observada. Nesse cenário, pickup realmente distante e sem teleporte continuará não confirmado até surgir outra interface aceita pelo servidor.
+
+Uma opção de menu segura para protótipo deve oferecer separadamente:
+
+- **Pegar bebê agora** — uma tentativa no `PickupPrompt` atual;
+- **Auto Pickup Baby** — tenta automaticamente quando `Workspace.BabyPickup` aparece;
+- **Estado do auto pickup** — aguardando, prompt encontrado, tentativa enviada, confirmado ou timeout;
+- **Sem teleporte** — não mover o personagem como fallback quando essa opção estiver ativa.
 
 ### Linha do tempo do lobby da partida
 
@@ -901,7 +1014,7 @@ Com base no que já foi confirmado, um futuro menu para o Squid Game X pode ser 
 4. **Portas** — registrar `DoorAccess`, forma exigida, prompts e caminho físico correspondente.
 5. **Ponte de vidro** — listar os pares, marcar lado real/falso por `CanCollide`, validar com `Size.Z` e acompanhar painéis quebrados.
 6. **Interações** — catálogo de elevadores, CCTV, incinerador, guarda-roupa e pickups.
-7. **Bebê** — portador por `HasBaby`, tipo, número de jogador, multiplicador `2x`, última posição de `dropBaby` e pickup/limpeza por `cleanUp`.
+7. **Bebê** — portador por `HasBaby`, tipo, número de jogador, multiplicador `2x`, última posição de `dropBaby`, modelo `Workspace.BabyPickup`, `PickupPrompt`, pickup/limpeza por `cleanUp` e protótipo de pickup automático sem teleporte.
 8. **Diagnóstico** — exibir caminho completo, classe, atributos, tags e alterações em tempo real.
 
 Uma regra importante: cada módulo deve procurar instâncias e atributos por nome/caminho em tempo de execução. Não deve depender de um único jogador, `JobId` ou posição capturada neste relatório.
@@ -968,6 +1081,9 @@ Use o filtro na categoria correta:
 - detector da fase Glass por `PlayingGlass`;
 - resolução dos pares da ponte por `CanCollide`, com confirmação por `Size.Z`;
 - detecção de painel quebrado por posição muito baixa, remoção ou perda de `TouchInterest`.
+- rastreador do bebê no chão por `BabyAction("dropBaby")` e `Workspace.BabyPickup`;
+- resolução dinâmica de `Workspace.BabyPickup.Trigger.PickupPrompt`;
+- confirmação de pickup por `PromptTriggered`, `HasBaby=true`, redução de `SprintSpeed`, `cleanUp` e remoção do modelo.
 
 ### Precisa de novas amostras
 
@@ -979,6 +1095,8 @@ Use o filtro na categoria correta:
 - acesso do Guarda Círculo;
 - remotes usados pelas fases e interações;
 - sequência completa das rotas de fuga.
+- confirmação de que `fireproximityprompt` consegue pegar o bebê a mais de `5` studs sem teleporte;
+- comportamento do servidor quando o `PickupPrompt` é acionado fora de `MaxActivationDistance`;
 
 ## Modelo para acrescentar novas descobertas
 
