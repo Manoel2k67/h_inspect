@@ -91,12 +91,14 @@ Config.Icons = {
     bookmark = "rbxassetid://7733692043",
     search = "rbxassetid://7734052925",
     laptop = "rbxassetid://7733965386",
+    target = "rbxassetid://7743872758",
 }
 
 Config.CategoryModules = {
     "categories/Home.lua",
     "categories/Players.lua",
     "categories/Items.lua",
+    "categories/AttackCapture.lua",
     "categories/Baby.lua",
     "categories/Interface.lua",
     "categories/World.lua",

@@ -267,9 +267,13 @@ local function installOutboundObserver(callback)
                         if type(checkcaller) == "function" then
                             pcall(function() callerIsExecutor = checkcaller() end)
                         end
+                        local callingScript = nil
+                        if type(getcallingscript) == "function" then
+                            pcall(function() callingScript = getcallingscript() end)
+                        end
                         local packed = table.pack(...)
                         for _, listener in pairs(current.Listeners) do
-                            pcall(listener, self, method, packed, callerIsExecutor)
+                            pcall(listener, self, method, packed, callerIsExecutor, callingScript)
                         end
                     end
                 end

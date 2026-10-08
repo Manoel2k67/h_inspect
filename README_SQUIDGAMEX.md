@@ -273,6 +273,15 @@ Tags = {GamemodeSound, Sound}
 
 Na amostra, o `Push` do jogador local estava no `Backpack`. Em outros jogadores, quando apareceu dentro do personagem, estava equipado.
 
+O `Push` da primeira fase e o soco/arma de outras situações devem ser tratados como `Tool`s diferentes até uma captura provar que compartilham o mesmo remote. O H Inspect 2.8.0 possui a aba **Combate** para fazer essa comparação. A coleta recomendada é:
+
+1. iniciar antes de equipar o item;
+2. equipar somente o `Push`, usar uma vez e tentar novamente durante a recarga;
+3. encerrar e copiar;
+4. repetir em outro relatório com o soco ou arma equipável.
+
+A captura relaciona `Tool.Activated`, clique de ataque, `Tool.Enabled`, atributos/Values e chamadas `FireServer`/`InvokeServer`. Nenhuma dessas chamadas é criada pelo inspetor. Se a tentativa durante a recarga não produzir chamada, o bloqueio ocorre antes do remote; se produzir a mesma chamada sem efeito, a recarga provavelmente é validada pelo servidor.
+
 ### Knife do Hide and Seek
 
 A amostra D confirmou uma `Tool` chamada `Knife` na mochila do jogador local durante Hide and Seek:

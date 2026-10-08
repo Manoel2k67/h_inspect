@@ -12,6 +12,7 @@ As operações do H Inspect são somente de leitura: ele não abre portas, não 
 - **Mapa:** portas, saídas, prompts, detectores, vidros, pontes, peças de material `Glass` e pistas visuais como `Highlight`, `SelectionBox`, decal, textura, `SurfaceAppearance`, `Beam` e GUI de mundo. A coleta agrupa objetos por assinatura e por pai/par, registra irmãos e filhos e pode ser copiada diretamente na aba.
 - **Estrutura:** busca livre em `ReplicatedStorage`, `Workspace`, `PlayerGui` ou personagem. Sem filtro, prioriza Values, Tools, remotes, módulos, prompts, tags e atributos.
 - **Remotes:** inventário de `RemoteEvent`, `UnreliableRemoteEvent` e `RemoteFunction`, além de monitor passivo de eventos recebidos por `OnClientEvent`. O inspetor não chama `FireServer` nem `InvokeServer`.
+- **Combate:** captura guiada e passiva para comparar `Push`, soco e outras armas equipáveis. Registra equipamento, tentativas de ativação, `Tool.Enabled`, atributos, Values e, quando o executor permite, as chamadas `FireServer`/`InvokeServer` feitas pelo próprio jogo.
 - **Bebê:** coleta guiada para soltar e pegar o bebê, reunindo estado local, eventos recebidos, objetos temporários próximos ao `dropBaby` e, quando o executor permite, observação passiva das chamadas que o próprio jogo envia durante o pickup.
 - **Comparação:** snapshot A e estado atual, destacando objetos adicionados, removidos ou alterados.
 - **Sessão:** `PlaceId`, `GameId`, `JobId` e horário UTC.
@@ -56,14 +57,26 @@ Essa regra é específica da estrutura atualmente observada no Squid Game X e de
 1. **Início**
 2. **Jogadores**
 3. **Itens**
-4. **Bebê**
-5. **Interface**
-6. **Mapa**
-7. **Estrutura**
-8. **Remotes**
-9. **Comparar**
-10. **Relatórios**
-11. **Configurações**
+4. **Combate**
+5. **Bebê**
+6. **Interface**
+7. **Mapa**
+8. **Estrutura**
+9. **Remotes**
+10. **Comparar**
+11. **Relatórios**
+12. **Configurações**
+
+## Captura guiada de Push, soco e armas
+
+Faça uma coleta por ferramenta para o relatório não misturar mecanismos diferentes:
+
+1. Na primeira fase, abra **Combate** e nomeie o teste, por exemplo `Push — Red Light/Green Light`.
+2. Clique em **Iniciar antes de equipar**, equipe o `Push`, use uma vez e tente usar novamente enquanto ele ainda estiver em recarga.
+3. Clique em **Analisar** e em **Copiar**.
+4. Limpe a captura e repita com o soco ou outra arma equipável, usando outro nome.
+
+O relatório relaciona cada clique/`Tool.Activated` com os remotes enviados logo depois. Se a segunda tentativa não enviar nada, o bloqueio acontece no cliente; se o mesmo remote for enviado novamente mas o golpe não funcionar, a validação provavelmente acontece no servidor. A captura não equipa, não ativa e não dispara remotes por conta própria.
 
 ## Coleta guiada do bebê
 
@@ -93,6 +106,7 @@ HInspectConfig.lua            identidade, tema, tamanho, atalhos e categorias
 HInspectSchema.lua            contratos das definições
 categories/                   páginas declarativas do inspetor
 runtime/Inspector.lua         coleta, comparação e exportação
+runtime/AttackCapture.lua     captura guiada de Push, soco e armas equipáveis
 runtime/Baby.lua              investigação guiada de drop e pickup do bebê
 runtime/Settings.lua          seleção do tema
 theme/wallpapers/             assets opcionais dos temas
@@ -127,7 +141,7 @@ As URLs atuais usam o repositório público `Manoel2k67/h_inspect`, branch `main
 git init
 git branch -M main
 git add .
-git commit -m "H Inspect 2.7.0 - coleta guiada do bebê"
+git commit -m "H Inspect 2.8.0 - captura guiada de combate"
 git remote add origin https://github.com/Manoel2k67/h_inspect.git
 git push -u origin main
 ```
