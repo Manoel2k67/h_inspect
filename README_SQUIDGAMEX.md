@@ -194,6 +194,19 @@ Cada minigame fica em um modelo próprio dentro de `Workspace.Map`:
 | Ponte de vidro | `Workspace.Map.Glass` | Confirmado |
 | Cadeiras Musicais | `Workspace.Map.MusicalChairs` | Confirmado |
 
+### Ordem dos seis jogos
+
+A partida possui **seis jogos**. Segundo a observação recorrente confirmada pelo jogador que fez as coletas, duas posições são fixas e as demais podem mudar de ordem:
+
+| Posição | Jogo | Regra |
+|---|---|---|
+| 1º | Red Light, Green Light | Sempre é o primeiro jogo |
+| 2º–4º | Outros minigames | A ordem pode variar entre partidas |
+| 5º | Ponte de vidro (`Glass`) | Sempre é o quinto jogo |
+| 6º | Outro minigame | Faz parte da ordem variável dos demais |
+
+Portanto, o menu pode usar a posição `1` como confirmação adicional de Red Light, Green Light e a posição `5` como confirmação adicional da ponte. Para os outros jogos, não deve associar uma fase a um número fixo. O detector principal ainda deve usar sinais específicos do estado atual, porque atributos de fases anteriores podem permanecer no jogador.
+
 No **lobby da partida**, a escada possui destinos/entradas que encaminham os jogadores para as fases:
 
 ```text
