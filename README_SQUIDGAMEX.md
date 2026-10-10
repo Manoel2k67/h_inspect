@@ -673,6 +673,18 @@ O HMenu `1.2.21` limita as tentativas a 4 studs, mantém o par de toque no mesmo
 
 **Próximo teste — `1.2.23`:** `Alcance experimental` mantém a ordem normal `HumanoidRootPart -> Trigger`, com slider de 4–160 studs (padrão 8) e uma tentativa por janela. Aumentar para 8, 12, 20 em janelas distintas testa gradualmente o alcance do mecanismo que produziu vínculo perto. O slider altera a seleção do alvo, não o tamanho físico da hitbox. O modo invertido sai das opções. Nenhum resultado dessa nova variação foi observado ainda.
 
+**Retorno da `1.2.23`, três diagnósticos enviados:**
+
+| Distância | Alcance usado | Resultado local | Deslocamento máximo | Velocidade máxima |
+|---|---|---|---|---|
+| 74,3 studs | 84 studs | Sem confirmação de assento | 124,4 studs | 57,1 studs/s |
+| 29,1 studs | 30 studs | Sem confirmação de assento | 33,6 studs | 51,9 studs/s |
+| 16,8 studs | 21 studs | Alvo ocupado por outro jogador | 32,7 studs | 139,3 studs/s |
+
+As três tentativas usaram `Alcance experimental`, mesmo nos arquivos cujo cabeçalho posterior diz Perto. Os dois relatórios Perto terminam na troca de modo e não contêm nova tentativa perto. O histórico de 60 linhas foi tomado por eventos do slider. Não há evidência de sucesso distante nesses testes, nem identificação conclusiva da causa dos deslocamentos.
+
+**Nova variação — `1.2.24`:** `Trigger ampliado` usa o slider apenas para escolher uma cadeira livre e amplia localmente o `Size` do seu Trigger por até 1 segundo, com tamanho calculado no espaço local da peça. Exige Trigger ancorado e sem colisão. Não chama toque simulado neste modo; observa `Touched` de partes do próprio personagem e espera confirmação estável de assento. O usuário deve dar um passo durante a janela. Restaura o tamanho ao terminar, cancelar, mudar de fase/personagem, encontrar vínculo ou erro, preservando atualizações intervenientes do jogo. O modo próximo continua disponível. O relatório registra contatos locais e deixa de registrar cada movimento do slider. Hipótese ainda sem resultado em partida; geometria local ou evento `Touched` não comprovam aceitação do servidor.
+
 ## Sistema de teleporte observado
 
 Há dois tipos de evidência relacionados às transições entre áreas.
