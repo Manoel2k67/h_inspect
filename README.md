@@ -14,6 +14,7 @@ As operações do H Inspect são somente de leitura: ele não abre portas, não 
 - **Remotes:** inventário de `RemoteEvent`, `UnreliableRemoteEvent` e `RemoteFunction`, além de monitor passivo de eventos recebidos por `OnClientEvent`. O inspetor não chama `FireServer` nem `InvokeServer`.
 - **Combate:** captura guiada e passiva para comparar `Push`, soco e outras armas equipáveis. Registra equipamento, tentativas de ativação, `Tool.Enabled`, atributos, Values e, quando o executor permite, as chamadas `FireServer`/`InvokeServer` feitas pelo próprio jogo.
 - **Bebê:** coleta guiada para soltar e pegar o bebê, reunindo estado local, eventos recebidos, objetos temporários próximos ao `dropBaby` e, quando o executor permite, observação passiva das chamadas que o próprio jogo envia durante o pickup.
+- **Cadeiras:** captura guiada da fase Cadeiras Musicais com fotografias de cadeira livre, assento real e assento no ar. Registra `Humanoid.Sit`, `SeatPart`, `Seat.Occupant`, `SeatWeld`, peças próximas, prompts, mudanças de estrutura e remotes.
 - **Comparação:** snapshot A e estado atual, destacando objetos adicionados, removidos ou alterados.
 - **Sessão:** `PlaceId`, `GameId`, `JobId` e horário UTC.
 
@@ -59,13 +60,14 @@ Essa regra é específica da estrutura atualmente observada no Squid Game X e de
 3. **Itens**
 4. **Combate**
 5. **Bebê**
-6. **Interface**
-7. **Mapa**
-8. **Estrutura**
-9. **Remotes**
-10. **Comparar**
-11. **Relatórios**
-12. **Configurações**
+6. **Cadeiras**
+7. **Interface**
+8. **Mapa**
+9. **Estrutura**
+10. **Remotes**
+11. **Comparar**
+12. **Relatórios**
+13. **Configurações**
 
 ## Captura guiada de Push, soco e armas
 
@@ -85,6 +87,16 @@ O relatório relaciona cada clique/`Tool.Activated` com os remotes enviados logo
 3. Clique em **Analisar** ou diretamente em **Copiar**.
 
 O relatório combina `BabyAction`, mudanças de `SprintSpeed`, atributos e objetos do jogador, instâncias adicionadas/removidas no `Workspace` e uma varredura ao redor do `CFrame` de `dropBaby`. Quando `hookmetamethod` e `getnamecallmethod` estão disponíveis, também registra passivamente `FireServer` e `InvokeServer` executados pelo próprio jogo durante o teste. A coleta não dispara nenhuma dessas chamadas.
+
+## Coleta completa das Cadeiras Musicais
+
+1. Abra **Cadeiras** antes da música e clique em **Iniciar**.
+2. Aproxime-se de uma cadeira vazia e clique em **Marcar livre**.
+3. Sente normalmente e, sem levantar, clique em **Marcar real**.
+4. Opcionalmente, use o teste de sentar no ar do HMenu e clique em **Marcar no ar**.
+5. Depois do encerramento ou da limpeza, clique em **Analisar** e **Copiar**.
+
+Cada fotografia inclui o estado completo do personagem, `Humanoid.Sit`, `SeatPart`, `Seat.Occupant`, juntas como `SeatWeld`, classes existentes sob `Workspace.Map.MusicalChairs` e peças genéricas dentro do raio configurado. Durante toda a captura, a categoria observa alterações de assentos, prompts, atributos, estados do Humanoid, instâncias adicionadas/removidas e remotes enviados/recebidos. O H Inspect não senta, não move o personagem e não dispara interações ou remotes.
 
 ## Como coletar remotes
 

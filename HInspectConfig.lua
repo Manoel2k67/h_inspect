@@ -100,6 +100,7 @@ Config.CategoryModules = {
     "categories/Items.lua",
     "categories/AttackCapture.lua",
     "categories/Baby.lua",
+    "categories/MusicalChairs.lua",
     "categories/Interface.lua",
     "categories/World.lua",
     "categories/Explorer.lua",
