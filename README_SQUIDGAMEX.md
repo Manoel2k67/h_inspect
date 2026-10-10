@@ -665,6 +665,14 @@ O HMenu `1.2.21` limita as tentativas a 4 studs, mantém o par de toque no mesmo
 
 **Experimento solicitado — HMenu `1.2.22`:** opção separada `Longe experimental`, até 160 studs, com `firetouchinterest(Trigger, HumanoidRootPart, estado)` e início/fim no mesmo frame. Testa a ordem invertida dos argumentos, sem atribuir posição/tamanho ao personagem ou ao Trigger. A hipótese de comportamento diferente no executor ainda não foi confirmada; hitbox de combate funcionar à distância não demonstra que a cadeira use a mesma validação. Uma tentativa total por janela observada, até 2 segundos de observação, com 0,5 segundo de vínculo local contínuo para registrar estabilidade. Diagnóstico copiável registra distância, erros, vínculo, deslocamento máximo e velocidade máxima observada. Precisamos correlacionar esse relatório com o resultado real da rodada; nenhum novo sucesso no servidor foi observado durante a implementação.
 
+**Retorno do teste `1.2.22` enviado pelo usuário:**
+
+- Toque invertido: tentativa em `844,91s`, cadeira `e81e371f-34a8-421d-9e46-a16003ba5c17`, distância `35,3 studs`. Resultado em `846,93s`: sem confirmação local, deslocamento máximo `51,5 studs`, velocidade máxima `37,8 studs/s`. Não prova qual componente causou o deslocamento.
+- Toque normal perto: tentativa em `893,73s`, cadeira `9b859455-0680-4635-8aeb-edabb815aa34`, distância `2,9 studs`. Vínculo confirmado em `893,89s` (`0,16s` depois), deslocamento máximo `3,0 studs`, velocidade máxima `0,7 studs/s`.
+- Relato complementar: após cair na lava, o usuário foi deslocado, permaneceu sentado em outro ponto e venceu. Disse ter visto outra pessoa tentando ocupar a cadeira, mas a identificação dessa cadeira é incerta. O relato de permanência/vitória reforça que houve um assento aceito naquele caso; a coleta não isola automação versus contato físico normal e não comprova aceitação inicial à distância.
+
+**Próximo teste — `1.2.23`:** `Alcance experimental` mantém a ordem normal `HumanoidRootPart -> Trigger`, com slider de 4–160 studs (padrão 8) e uma tentativa por janela. Aumentar para 8, 12, 20 em janelas distintas testa gradualmente o alcance do mecanismo que produziu vínculo perto. O slider altera a seleção do alvo, não o tamanho físico da hitbox. O modo invertido sai das opções. Nenhum resultado dessa nova variação foi observado ainda.
+
 ## Sistema de teleporte observado
 
 Há dois tipos de evidência relacionados às transições entre áreas.
