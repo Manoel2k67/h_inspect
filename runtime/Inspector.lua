@@ -1753,6 +1753,11 @@ function Inspector:Create(options)
             "Faça uma varredura do mapa antes de copiar.")
     end
 
+    local function copyStructureReport()
+        copyText(lastStructureReport, "structure_status",
+            "Faça uma busca na estrutura antes de copiar.")
+    end
+
     local function copyRemoteReport()
         copyText(lastRemoteReport, "remote_status",
             "Faça um inventário de remotes antes de copiar.")
@@ -1806,6 +1811,8 @@ function Inspector:Create(options)
             copyWorldReport()
         elseif name == "ScanStructure" then
             scanStructure(true)
+        elseif name == "CopyStructureReport" then
+            copyStructureReport()
         elseif name == "ScanRemotes" then
             scanRemotes(true)
         elseif name == "CopyRemoteReport" then

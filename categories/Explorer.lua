@@ -13,6 +13,7 @@ return {
                 { Kind = "Input", Setting = "StructureFilter", Id = "structure_filter", Label = "Nome ou caminho", Placeholder = "role, glass, door, remote...", Default = "" },
                 { Kind = "Slider", Setting = "MaxStructureResults", Id = "max_structure_results", Label = "Máximo de resultados", Min = 50, Max = 500, Default = 200, Step = 50 },
                 { Kind = "Button", Setting = "ScanStructure", Id = "scan_structure", Label = "Varrer estrutura", Description = "Sem filtro, prioriza Values, Tools, remotes, módulos, prompts, tags e atributos.", ButtonText = "Varrer" },
+                { Kind = "Button", Setting = "CopyStructureReport", Id = "copy_structure_report", Label = "Copiar relatório da estrutura", Description = "Copia o relatório da última busca, incluindo os resultados que não cabem na prévia.", ButtonText = "Copiar" },
             },
         },
         {
