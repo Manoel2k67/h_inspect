@@ -648,16 +648,22 @@ Estados que um menu futuro pode representar:
 3. **Sentado:** verificar no personagem local `Humanoid.Sit=true` e `Humanoid.SeatPart` diferente de `nil`.
 4. **Limpeza:** mensagem `Waiting for guards to clean up..` recebida.
 
-`Humanoid.Sit` e `SeatPart` são sinais recomendados da API do Roblox, mas ainda precisam ser registrados nesta experiência para confirmar se as cadeiras usam objetos `Seat` normais. Se usarem, cada cadeira também pode ser classificada como livre quando `Seat.Occupant=nil` ou ocupada quando `Occupant` aponta para um `Humanoid`.
+### Atualização — inspects de 2026-10-10, 21:21:27Z e 21:23:04Z
 
-Coleta recomendada para confirmar as cadeiras físicas:
+Os dois anexos de `21:21:27Z` são cópias idênticas. `jogo das cadeiras - coleta.md` já registra o personagem sentado; as novas coletas confirmam a estrutura física:
 
-- em **Estrutura**, usar escopo `Workspace` e filtros `MusicalChairs`, `chair`, `seat` e `occupant`;
-- inspecionar o próprio jogador antes e depois de sentar;
-- monitorar `Notify`, `Timer`, `GameStateUpdate` e `GamemodeAction` desde o começo da música até a limpeza;
-- copiar uma coleta quando a cadeira estiver livre e outra quando estiver ocupada.
+- Cadeiras: `Workspace.Map.MusicalChairs.Chairs.<id>.Seat` e `.Trigger`.
+- Mesmo ocupado, o `Seat` tem `Disabled=true`, `CanTouch=false` e `CanCollide=false`. Portanto essas propriedades não indicam se a janela para sentar está aberta.
+- Na foto sentada, `Humanoid.SeatPart` aponta para a cadeira, `Seat.Occupant` aponta para o Humanoid local e `Seat.SeatWeld` conecta o Seat ao `HumanoidRootPart`. O weld fica na cadeira, não no personagem.
+- Na segunda captura, `TAKE A SEAT!` chega em `+1.630s`; os nove `Trigger.TouchInterest` aparecem entre `+1.639s` e `+1.648s`. São removidos em aproximadamente `+21.86s`.
+- No início dessa captura, o jogador está a aproximadamente `59–69` studs dos assentos. Outros jogadores ocupam as nove cadeiras; não há confirmação de assento para o jogador local.
+- O servidor envia `toggleRagdoll` para o jogador local em `+4.819s`, `+9.379s` e `+14.610s`. A captura termina com aviso de eliminação. Há disputa de WalkSpeed (`12`/`17`) e de `RAGDOLL_FORCE_DISABLE`, mas não há evidência suficiente para atribuir cada empurrão a uma única causa.
 
-Com os dados atuais, já é possível planejar alertas de **SENTE AGORA**, estado local sentado/não sentado, contagem observada e indicação de cadeiras livres ou próximas quando a estrutura física for confirmada. A coleta não mostrou um remote específico de sentar.
+**Hipótese de código, não confirmação da coleta:** o HMenu `1.2.20` acionava `firetouchinterest` sem limite de distância e deixava um frame entre início/fim, além de repetir tentativas. A implementação do executor não foi inspecionada e o hook de chamadas estava indisponível. Não foi encontrado um remote específico de sentar. A existência dos Triggers confirma o mecanismo observado, mas não prova que um toque sintético distante seja aceito pelo servidor.
+
+O HMenu `1.2.21` limita as tentativas a 4 studs, mantém o par de toque no mesmo frame, tenta uma vez por TouchInterest e remove a alternativa local `Seat:Sit()`. A confirmação completa exige o weld ligado ao personagem correto; vínculos parciais já bloqueiam nova tentativa e interferência das proteções. Resultado em partida ainda pendente de validação.
+
+**Experimento solicitado — HMenu `1.2.22`:** opção separada `Longe experimental`, até 160 studs, com `firetouchinterest(Trigger, HumanoidRootPart, estado)` e início/fim no mesmo frame. Testa a ordem invertida dos argumentos, sem atribuir posição/tamanho ao personagem ou ao Trigger. A hipótese de comportamento diferente no executor ainda não foi confirmada; hitbox de combate funcionar à distância não demonstra que a cadeira use a mesma validação. Uma tentativa total por janela observada, até 2 segundos de observação, com 0,5 segundo de vínculo local contínuo para registrar estabilidade. Diagnóstico copiável registra distância, erros, vínculo, deslocamento máximo e velocidade máxima observada. Precisamos correlacionar esse relatório com o resultado real da rodada; nenhum novo sucesso no servidor foi observado durante a implementação.
 
 ## Sistema de teleporte observado
 
